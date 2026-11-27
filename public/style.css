@@ -215,33 +215,44 @@ tr:first-of-type + tr td { background: rgba(214, 178, 106, .08); }
 /* Matte pastel: soft, flat, dark pips */
 [data-skin="matte"] .die:not(.d-X) { background: color-mix(in srgb, var(--dc) 75%, #f3ece2); box-shadow: inset 0 -2px 0 #0002; }
 [data-skin="matte"] .die:not(.d-X) i { background: #2a2530; }
-/* Numerals: the number instead of pips */
-[data-skin="numerals"] .die:not(.d-X) { grid-template: 1fr / 1fr; place-items: center; padding: 0; }
-[data-skin="numerals"] .die:not(.d-X) i { display: none; }
-[data-skin="numerals"] .die:not(.d-X)::after { content: attr(data-v); font: 700 calc(var(--cell, 52px) * 0.5) Georgia, serif; color: #fff; text-shadow: 0 1px 2px #0008; }
-[data-skin="numerals"] .die.d-Y::after { color: #3a2a00; text-shadow: none; }
 .die.d-R { --dc: var(--R); } .die.d-Y { --dc: var(--Y); } .die.d-G { --dc: var(--G); } .die.d-B { --dc: var(--B); } .die.d-P { --dc: var(--P); }
 
-/* Card suits: each color has its own suit, pips are drawn as that suit, so color is readable twice over.
-   Crimson ♥, Amber ♦, Jade ♣, Cobalt ♠, Violet ★ */
-.die.d-R { --suit: '♥'; } .die.d-Y { --suit: '♦'; } .die.d-G { --suit: '♣'; } .die.d-B { --suit: '♠'; } .die.d-P { --suit: '★'; }
-[data-skin="cards"] .die:not(.d-X) { background: color-mix(in srgb, var(--dc) 16%, #fffdf8); box-shadow: inset 0 0 0 calc(var(--cell, 52px) * .09) var(--dc), 0 2px 3px #0008; padding: calc(var(--cell, 52px) * .13); }
-[data-skin="cards"] .die:not(.d-X) i { background: none; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: visible; display: grid; place-items: center; }
-[data-skin="cards"] .die:not(.d-X) i.on::before { content: var(--suit); color: var(--dc); font: 700 calc(var(--cell, 52px) * .22) / 1 'Segoe UI Symbol', 'DejaVu Sans', sans-serif; }
-[data-skin="cards"] .die.d-Y:not(.d-X) i.on::before { color: #c98a00; }
+/* Card suits, drawn as shapes (not font glyphs) so they look identical on every device.
+   Each color always has the same suit: red heart, yellow diamond, green club, blue spade, purple star. */
+.d-R, .c-R { --suit: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M12%2021C5%2015.5%202%2012%202%208.5%202%205.4%204.4%203%207.3%203c1.9%200%203.6%201%204.7%202.6C13.1%204%2014.8%203%2016.7%203%2019.6%203%2022%205.4%2022%208.5%2022%2012%2019%2015.5%2012%2021z'/%3E%3C/svg%3E"); } .d-Y, .c-Y { --suit: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M12%201.5%2020.5%2012%2012%2022.5%203.5%2012z'/%3E%3C/svg%3E"); } .d-G, .c-G { --suit: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Ccircle%20cx='12'%20cy='6.8'%20r='4.6'/%3E%3Ccircle%20cx='6.6'%20cy='13.4'%20r='4.6'/%3E%3Ccircle%20cx='17.4'%20cy='13.4'%20r='4.6'/%3E%3Cpath%20d='M10.6%2012h2.8l1.6%2010H9z'/%3E%3C/svg%3E"); } .d-B, .c-B { --suit: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M12%201.5C9.2%206%202.5%209.3%202.5%2014.2c0%202.7%202.1%204.7%204.6%204.7%201.7%200%203.1-.8%203.9-2.1L9.6%2022.5h4.8L13%2016.8c.8%201.3%202.2%202.1%203.9%202.1%202.5%200%204.6-2%204.6-4.7C21.5%209.3%2014.8%206%2012%201.5z'/%3E%3C/svg%3E"); } .d-P, .c-P { --suit: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='M12%201.5l3.1%207%207.4.7-5.6%205%201.7%207.5L12%2017.8l-6.6%203.9%201.7-7.5-5.6-5%207.4-.7z'/%3E%3C/svg%3E"); }
+[data-skin="cards"] .die:not(.d-X) { background: #fffdf8; box-shadow: inset 0 0 0 calc(var(--cell, 52px) * .075) var(--dc), 0 2px 4px rgba(0, 0, 0, .45); padding: calc(var(--cell, 52px) * .13); }
+[data-skin="cards"] .die:not(.d-X) i { width: 92%; height: 92%; border-radius: 0; box-shadow: none; background: var(--dc); -webkit-mask: var(--suit) center / contain no-repeat; mask: var(--suit) center / contain no-repeat; }
 
-/* Knitted: stitched wool texture in the die's color, pips are big cream buttons with a dark rim */
+/* Knitted: ribbed wool. Straight vertical rib columns (up-and-down cords) with stitch rows,
+   in the die's color; pips are big cream buttons with a dark rim. */
 [data-skin="knit"] .die:not(.d-X) {
-  /* chunky stockinette: fat yarn loops in V columns, drawn over the die's color */
-  background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='20'%20height='16'%20viewBox='0%200%2020%2016'%3E%3Cg%20stroke='%23000'%20stroke-opacity='.45'%20stroke-width='1.3'%20fill='%23fff'%20fill-opacity='.3'%3E%3Cellipse%20cx='5.5'%20cy='8'%20rx='4'%20ry='7.6'%20transform='rotate%28-28%205.5%208%29'/%3E%3Cellipse%20cx='14.5'%20cy='8'%20rx='4'%20ry='7.6'%20transform='rotate%2828%2014.5%208%29'/%3E%3C/g%3E%3Cg%20stroke='%23fff'%20stroke-opacity='.35'%20stroke-width='1'%20fill='none'%3E%3Cpath%20d='M3.2%203.5%20Q5%207%206.8%2012'%20transform='rotate%28-28%205.5%208%29'/%3E%3Cpath%20d='M12.2%203.5%20Q14%207%2015.8%2012'%20transform='rotate%2828%2014.5%208%29'/%3E%3C/g%3E%3C/svg%3E") 0 0 / calc(var(--cell, 52px) * .42) calc(var(--cell, 52px) * .34), var(--dc);
-  border-radius: 26%;
-  box-shadow: inset 0 0 0 calc(var(--cell, 52px) * .05) color-mix(in srgb, var(--dc) 65%, #000), inset 0 -3px 0 #0003, 0 2px 3px #0008;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .16) 0 1.5px, transparent 1.5px calc(var(--cell, 52px) * .16)),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .38) 0, rgba(0, 0, 0, .08) calc(var(--cell, 52px) * .05), rgba(255, 255, 255, .22) calc(var(--cell, 52px) * .1), rgba(0, 0, 0, .08) calc(var(--cell, 52px) * .15), rgba(0, 0, 0, .38) calc(var(--cell, 52px) * .2)),
+    var(--dc);
+  border-radius: 24%;
+  box-shadow: inset 0 0 0 calc(var(--cell, 52px) * .05) color-mix(in srgb, var(--dc) 60%, #000), 0 2px 4px rgba(0, 0, 0, .5);
 }
-[data-skin="knit"] .die:not(.d-X) i { width: 86%; height: 86%; background: radial-gradient(circle at 50% 50%, #0000 0 18%, #fff7e6 20%); box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #2a1f1a, inset 0 -2px 0 #0003; }
+[data-skin="knit"] .die:not(.d-X) i { width: 84%; height: 84%; background: radial-gradient(circle, rgba(0, 0, 0, .35) 0 14%, #fff7e6 18%); box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #2a1f1a, inset 0 -2px 0 rgba(0, 0, 0, .2); }
+
+/* ---------- Window squares follow the chosen dice skin (and color set) ---------- */
+[data-skin="glass"] .cell[class*="c-"] { background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, .45), transparent 45%), var(--cc); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .35), inset 0 0 10px rgba(255, 255, 255, .25); opacity: .9; }
+[data-skin="minakari"] .cell[class*="c-"] { background: radial-gradient(circle, color-mix(in srgb, var(--cc) 80%, #fff), var(--cc) 60%, color-mix(in srgb, var(--cc) 70%, #000)); box-shadow: inset 0 0 0 calc(var(--cell) * .06) #d4a843; opacity: .9; }
+[data-skin="minakari"] .cell.v { box-shadow: inset 0 0 0 calc(var(--cell) * .06) #d4a843; }
+[data-skin="gem"] .cell[class*="c-"] { background: conic-gradient(from 45deg, color-mix(in srgb, var(--cc) 70%, #fff), var(--cc), color-mix(in srgb, var(--cc) 60%, #000), var(--cc), color-mix(in srgb, var(--cc) 70%, #fff)); opacity: .85; }
+[data-skin="matte"] .cell[class*="c-"] { background: color-mix(in srgb, var(--cc) 70%, #f3ece2); box-shadow: none; opacity: .85; }
+[data-skin="cards"] .cell[class*="c-"] { background: color-mix(in srgb, var(--cc) 22%, #fffdf8); box-shadow: inset 0 0 0 calc(var(--cell) * .075) var(--cc); opacity: 1; }
+[data-skin="cards"] .cell[class*="c-"]:not(:has(.die))::after { content: ''; width: 58%; height: 58%; background: var(--cc); opacity: .55; -webkit-mask: var(--suit) center / contain no-repeat; mask: var(--suit) center / contain no-repeat; }
+[data-skin="knit"] .cell[class*="c-"], [data-skin="knit"] .cell.v {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .14) 0 1.5px, transparent 1.5px calc(var(--cell) * .16)),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .3) 0, rgba(0, 0, 0, .06) calc(var(--cell) * .05), rgba(255, 255, 255, .2) calc(var(--cell) * .1), rgba(0, 0, 0, .06) calc(var(--cell) * .15), rgba(0, 0, 0, .3) calc(var(--cell) * .2)),
+    var(--cc, #e9dfc8);
+  opacity: .88; border-radius: 22%; }
 
 /* Amber is light: keep its pips dark in every skin so the number reads from across the table */
 [data-skin="glass"] .die.d-Y i, [data-skin="gem"] .die.d-Y i, [data-skin="minakari"] .die.d-Y i { background: #3a2a00; box-shadow: none; }
-[data-skin="knit"] .die.d-Y i { background: #3a2a00; box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #fff7e6; }
+[data-skin="knit"] .die.d-Y i { background: radial-gradient(circle, rgba(255, 255, 255, .35) 0 14%, #2a1d00 18%); box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #fff7e6; }
 
 
 /* ==========================================================================

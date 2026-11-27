@@ -363,7 +363,7 @@ function renderEnd() {
 
 // Dice skin: purely visual, remembered on this device.
 function applySkin(v) { document.body.dataset.skin = v; localStorage.setItem('gw-skin', v); }
-{ const sel = document.getElementById('skin'); sel.value = localStorage.getItem('gw-skin') || 'classic'; applySkin(sel.value); sel.onchange = () => applySkin(sel.value); }
+{ const sel = document.getElementById('skin'); sel.value = localStorage.getItem('gw-skin') || 'classic'; if (!sel.value) sel.value = 'classic'; applySkin(sel.value); sel.onchange = () => applySkin(sel.value); }
 // Turn clock for timed games.
 setInterval(() => {
   const el = document.getElementById('clock');
