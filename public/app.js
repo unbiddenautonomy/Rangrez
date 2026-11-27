@@ -1,0 +1,254 @@
+// Sathiya client. Vanilla JS; talks to the server over one WebSocket.
+const COLOR_NAMES = { R: 'Crimson', Y: 'Amber', G: 'Jade', B: 'Cobalt', P: 'Violet' };
+const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+const $app = document.getElementById('app');
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let ws, S = null, code = null, isHost = false;
+let ui = { die: null, tool: null, from: null, trackDie: null };
+const saved = () => JSON.parse(localStorage.getItem('gw-seat') || 'null');
+
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws.onopen = () => { const s = saved(); if (s) ws.send(JSON.stringify({ t: 'resume', ...s })); else render(); };
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.t === 'joined') { localStorage.setItem('gw-seat', JSON.stringify({ code: m.code, playerId: m.playerId, secret: m.secret })); history.replaceState(null, '', '/' + m.code); }
+    else if (m.t === 'state') { const prevTurn = S && `${S.round}-${S.turn}`; S = m.state; code = m.code; isHost = m.host; if (prevTurn !== `${S.round}-${S.turn}`) resetUi(); render(); }
+    else if (m.t === 'error') toast(m.message);
+    else if (m.t === 'resumeFailed' || m.t === 'left') { localStorage.removeItem('gw-seat'); S = null; code = null; history.replaceState(null, '', '/'); render(); }
+  };
+  ws.onclose = () => { toast('Connection lost, reconnecting…'); setTimeout(connect, 1500); };
+}
+const send = (m) => ws.send(JSON.stringify(m));
+const act = (action) => send({ t: 'act', action });
+function resetUi() { ui = { die: null, tool: null, from: null, trackDie: null }; }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function dieHtml(d, attrs = '', cls = '') {
+  const on = PIPS[d.value];
+  return `<div class="die d-${d.color} ${cls}" ${attrs} title="${COLOR_NAMES[d.color]} ${d.value}">${[...Array(9)].map((_, i) => `<i class="${on.includes(i) ? 'on' : ''}"></i>`).join('')}</div>`;
+}
+function windowHtml(pattern, win, opts = {}) {
+  let h = `<div class="window ${opts.small ? 'small' : ''}">`;
+  for (let i = 0; i < 20; i++) {
+    const req = pattern.rows[Math.floor(i / 5)][i % 5];
+    const cls = req === '.' ? '' : /[1-6]/.test(req) ? 'v' : 'c-' + req;
+    const d = win && win[i];
+    const click = opts.clickable && opts.clickable(i, d);
+    h += `<div class="cell ${cls} ${click ? 'clickable' : ''} ${opts.from === i ? 'from' : ''}" ${click ? `data-cell="${i}"` : ''}>`;
+    if (d) h += dieHtml(d);
+    else if (/[1-6]/.test(req)) h += dieHtml({ color: 'X', value: +req });
+    h += '</div>';
+  }
+  return h + '</div>';
+}
+const dots = (n) => '●'.repeat(n);
+
+// ---------- Pattern editor ----------
+let editing = null;
+const EDIT_CYCLE = ['.', 'R', 'Y', 'G', 'B', 'P', '1', '2', '3', '4', '5', '6'];
+const blank = () => ({ name: '', difficulty: 4, rows: ['.....', '.....', '.....', '.....'] });
+async function openEditor() {
+  const r = await fetch('/api/patterns').then((x) => x.json());
+  editing = { list: r.custom, builtin: r.builtin, cur: blank(), brush: 'R' };
+  renderEditor();
+}
+async function savePatterns(body) {
+  const r = await fetch('/api/patterns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.json());
+  if (r.error) return toast(r.error);
+  editing.list = r.custom; editing.cur = blank(); toast('Saved'); renderEditor();
+}
+function renderEditor() {
+  const E = editing, cur = E.cur;
+  const brushHtml = EDIT_CYCLE.map((b) => `<div class="cell ${b === '.' ? '' : /[1-6]/.test(b) ? 'v' : 'c-' + b} clickable ${E.brush === b ? 'from' : ''}" data-brush="${b}" style="--cell:40px">${/[1-6]/.test(b) ? dieHtml({ color: 'X', value: +b }) : b === '.' ? '<span class="muted">open</span>' : ''}</div>`).join('');
+  $app.innerHTML = `<div class="stack">
+  <div class="panel">
+    <h2>${cur.id ? 'Edit' : 'New'} window pattern</h2>
+    <p class="muted">Pick a brush, then click cells to paint them. Clicking a cell that already has the brush clears it.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${brushHtml}</div>
+    ${windowHtml(cur, null, { clickable: () => true })}
+    <div class="row" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <input id="pname" placeholder="Pattern name" maxlength="40" value="${esc(cur.name)}">
+      <select id="pdiff">${[3, 4, 5, 6].map((d) => `<option ${+cur.difficulty === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
+      <button class="primary" id="psave">Save pattern</button>
+      ${cur.id ? '<button id="pnew">New blank</button>' : ''}
+    </div>
+    <p class="legend">Difficulty is also the number of favor tokens the player gets.</p>
+  </div>
+  <div class="panel">
+    <h2>My custom patterns (${E.list.length})</h2>
+    <div class="patterns">${E.list.map((p) => `<div class="pchoice" style="cursor:default">${windowHtml(p, null, { small: true })}<div class="pn">${esc(p.name)}</div><div class="dots">${dots(p.difficulty)}</div>
+      <button data-edit="${p.id}">Edit</button> <button data-del="${p.id}">Delete</button></div>`).join('') || '<span class="muted">None yet.</span>'}</div>
+    <h3 style="margin-top:14px">Import / export JSON</h3>
+    <p class="muted">Format: a list of {"name", "difficulty" 3-6, "rows": 4 strings of 5 characters}. Use . for open, R Y G B P for colors, 1-6 for values.</p>
+    <textarea id="pjson" rows="6" style="width:100%;background:#15131c;color:var(--text);border:1px solid #4a4360;border-radius:8px;font-family:monospace" placeholder='[{"name":"My Window","difficulty":4,"rows":["R...3",".G.4.","..B..","1...Y"]}]'></textarea>
+    <p><button id="pimport">Import</button> <button id="pexport">Export mine</button> <button id="pback">Back</button></p>
+  </div></div>`;
+  const q = (sel, fn) => $app.querySelectorAll(sel).forEach((el) => (el.onclick = () => fn(el)));
+  const keep = () => { cur.name = document.getElementById('pname').value; cur.difficulty = +document.getElementById('pdiff').value; };
+  q('[data-brush]', (el) => { keep(); E.brush = el.dataset.brush; renderEditor(); });
+  q('[data-cell]', (el) => {
+    keep(); const i = +el.dataset.cell, r = Math.floor(i / 5), c = i % 5, row = cur.rows[r].split('');
+    row[c] = row[c] === E.brush ? '.' : E.brush; cur.rows = cur.rows.map((x, k) => (k === r ? row.join('') : x)); renderEditor();
+  });
+  q('#psave', () => { keep(); savePatterns(cur); });
+  q('#pnew', () => { E.cur = blank(); renderEditor(); });
+  q('[data-edit]', (el) => { E.cur = JSON.parse(JSON.stringify(E.list.find((p) => p.id === el.dataset.edit))); renderEditor(); });
+  q('[data-del]', async (el) => { const r = await fetch('/api/patterns/' + el.dataset.del, { method: 'DELETE' }).then((x) => x.json()); E.list = r.custom; renderEditor(); });
+  q('#pimport', () => { try { savePatterns(JSON.parse(document.getElementById('pjson').value)); } catch { toast('That is not valid JSON'); } });
+  q('#pexport', () => { document.getElementById('pjson').value = JSON.stringify(E.list.map(({ name, difficulty, rows }) => ({ name, difficulty, rows })), null, 1); });
+  q('#pback', () => { editing = null; render(); });
+}
+
+function render() {
+  if (editing && !S) return renderEditor();
+  document.getElementById('roomInfo').innerHTML = code ? `<span class="muted">Room</span> <span class="code">${code}</span> <button id="copy">Copy link</button>` : '';
+  const c = document.getElementById('copy'); if (c) c.onclick = () => { navigator.clipboard?.writeText(location.origin + '/' + code); toast('Link copied'); };
+  if (!S) return renderHome();
+  ({ lobby: renderLobby, choosing: renderChoosing, playing: renderGame, ended: renderEnd })[S.phase]();
+}
+
+function renderHome() {
+  const fromUrl = location.pathname.slice(1).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+  $app.innerHTML = `<div class="home panel">
+    <h2>Draft dice. Build a window.</h2>
+    <p class="muted">A dice-drafting game for 1 to 4 players. Create a room and share its code, or join a friend's room.</p>
+    <input id="name" placeholder="Your name" maxlength="20" value="${esc(localStorage.getItem('gw-name') || '')}">
+    <button class="primary" id="create">Create a room</button>
+    <div class="row"><input id="code" placeholder="Room code" maxlength="4" value="${fromUrl}"><button id="join">Join</button></div>
+    <button id="editor">Pattern editor (add your own windows)</button>
+  </div>`;
+  document.getElementById('editor').onclick = () => openEditor();
+  const nm = () => { const v = document.getElementById('name').value.trim(); localStorage.setItem('gw-name', v); return v || 'Player'; };
+  document.getElementById('create').onclick = () => send({ t: 'create', name: nm() });
+  document.getElementById('join').onclick = () => send({ t: 'join', name: nm(), code: document.getElementById('code').value });
+}
+
+function renderLobby() {
+  $app.innerHTML = `<div class="home panel">
+    <h2>Waiting room</h2>
+    <p class="muted">Share the code <span class="code">${code}</span> or the link. Players on any device can join until the host starts.</p>
+    <ul class="players">${S.players.map((p, i) => `<li>${esc(p.name)} ${i === 0 ? '<span class="muted">(host)</span>' : ''} ${p.connected ? '' : '<span class="off">offline</span>'}</li>`).join('')}</ul>
+    <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Sathiya originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Sathiya originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
+    ${isHost ? `<button class="primary" id="start">Start game (${S.players.length} player${S.players.length > 1 ? 's' : ''})</button>` : '<p class="muted">Waiting for the host to start…</p>'}
+    <button id="leave">Leave room</button>
+  </div>`;
+  if (isHost) {
+    document.getElementById('start').onclick = () => send({ t: 'start' });
+    document.getElementById('pset').onchange = (e) => send({ t: 'options', patternSet: e.target.value });
+  }
+  document.getElementById('leave').onclick = () => send({ t: 'leave' });
+}
+
+function secretHtml(p) { return p.secret ? `<span class="secret" style="background:var(--${p.secret})"></span> ${COLOR_NAMES[p.secret]}` : '?'; }
+
+function renderChoosing() {
+  const me = S.players[S.you];
+  $app.innerHTML = `<div class="panel">
+    <h2>Choose your window</h2>
+    <p class="muted">Your secret color is ${secretHtml(me)}: at the end you score the total pips of that color. Harder windows have more restrictions and give more favor tokens (●) for tools.</p>
+    ${me.ready ? `<p>You chose <b>${esc(me.pattern.name)}</b>. Waiting for: ${S.players.filter((p) => !p.ready).map((p) => esc(p.name)).join(', ')}</p>` : `
+    <div class="patterns">${me.choices.map((p) => `<div class="pchoice" data-pid="${p.id}">${windowHtml(p, null)}<div class="pn">${esc(p.name)}</div><div class="dots">${dots(p.difficulty)}</div><div class="muted">Difficulty ${p.difficulty}</div></div>`).join('')}</div>`}
+    <p class="legend">Tinted cells need that color. Faded dice need that value. Open cells take anything.</p>
+  </div>`;
+  $app.querySelectorAll('[data-pid]').forEach((el) => (el.onclick = () => send({ t: 'choose', patternId: el.dataset.pid })));
+}
+
+const TOOL_HELP = {
+  chisel: 'Pick a pool die, then press + or −.', recast: 'Pick a pool die, then press Use.', flip: 'Pick a pool die, then press Use.',
+  swapTrack: 'Pick a pool die and a round-track die, then press Use.', stir: 'Press Use to reroll the pool.',
+  leadKnife: 'Click a die in your window, then its new cell.', file: 'Click a die in your window, then its new cell.',
+  loose: 'Pick a pool die, then click any cell not touching a die.',
+};
+
+function renderGame() {
+  const me = S.players[S.you], mine = S.current === S.you, cur = S.players[S.current];
+  const moving = ui.tool === 'leadKnife' || ui.tool === 'file';
+  const canPlace = mine && !me.placed;
+  const clickable = (i, d) => {
+    if (!mine) return false;
+    if (moving) return ui.from === null ? !!d : !d;
+    return canPlace && ui.die !== null && !d;
+  };
+  const orderNames = S.order.map((pi, k) => `<span style="${k === S.turn ? 'color:var(--gold);font-weight:700' : k < S.turn ? 'opacity:.4' : ''}">${esc(S.players[pi].name)}</span>`).join(' → ');
+
+  $app.innerHTML = `
+  <div class="turnbar ${mine ? 'mine' : ''}">
+    <div><b>Round ${S.round}/${S.rounds}</b> · ${mine ? 'Your turn' : `${esc(cur.name)}'s turn`} ${mine && S.secondTurn ? '(second pick)' : ''}<div class="muted">${orderNames}</div></div>
+    ${mine ? `<button class="primary" id="pass">${me.placed ? 'End turn' : 'Pass'}</button>` : ''}
+  </div>
+  <div class="game" style="margin-top:14px">
+    <div class="stack">
+      <div class="panel">
+        <h3>Draft pool</h3>
+        <div class="pool">${S.pool.map((d) => dieHtml(d, `data-die="${d.id}"`, (ui.die === d.id ? 'sel ' : '') + (S.lock === d.id ? 'locked' : ''))).join('') || '<span class="muted">Empty</span>'}</div>
+        <p class="muted">${mine ? (me.placed ? 'Die placed. Use a tool or end your turn.' : ui.tool ? TOOL_HELP[ui.tool] : 'Pick a die, then click a cell in your window.') : 'Waiting for ' + esc(cur.name) + '…'}${S.lock ? ' The gold-ringed die was changed and must be the one you draft.' : ''}</p>
+      </div>
+      <div class="panel" style="text-align:center">
+        <h3>${esc(me.name)} · ${esc(me.pattern.name)}</h3>
+        ${windowHtml(me.pattern, me.window, { clickable, from: ui.from })}
+        <p class="muted">Favor <span class="favor">${dots(me.favor) || '0'}</span> · Secret color ${secretHtml(me)}</p>
+        <p class="legend">First die on an edge. Later dice must touch a placed die (diagonals count). Same color or value can never sit side by side.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="panel"><h3>Other windows</h3><div class="others">${S.players.map((p, i) => i === S.you ? '' : `<div class="other ${S.current === i ? 'active' : ''}"><div class="nm">${esc(p.name)} <span class="favor">${dots(p.favor)}</span> ${p.connected ? '' : '<span class="off">offline</span>'}</div>${windowHtml(p.pattern, p.window, { small: true })}<div class="muted">${esc(p.pattern.name)}</div></div>`).join('') || '<span class="muted">Solo game</span>'}</div></div>
+      <div class="panel"><h3>Tools</h3><div class="cards">${S.tools.map((t) => `
+        <div class="card tool ${ui.tool === t.id ? 'armed' : ''}"><div><b>${esc(t.name)}</b> <span class="favor">${dots(t.cost)}</span><div class="muted">${esc(t.text)}</div></div>
+        <div>${mine && ui.tool === t.id ? toolButtons(t.id) : `<button data-tool="${t.id}" ${!mine || me.toolUsed || me.favor < t.cost ? 'disabled' : ''}>Use</button>`}</div></div>`).join('')}</div></div>
+      <div class="panel"><h3>Public objectives</h3><div class="cards">${S.objectives.map((o) => `<div class="card"><b>${esc(o.name)}</b> · ${esc(o.pts)}<div class="muted">${esc(o.text)}</div></div>`).join('')}</div></div>
+      <div class="panel"><h3>Round track</h3><div class="track">${S.track.map((r, ri) => `<div class="slot">${ri + 1}${r.map((d) => dieHtml(d, `data-tr="${ri}" data-trd="${d.id}"`, ui.trackDie && ui.trackDie.id === d.id ? 'sel' : '')).join('')}</div>`).join('') || '<span class="muted">Leftover dice land here each round.</span>'}</div></div>
+      <div class="panel"><h3>Log</h3><div class="log">${S.log.slice().reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div></div>
+    </div>
+  </div>`;
+  bindGame(me);
+}
+
+function toolButtons(id) {
+  const go = (label, extra = '') => `<button class="primary" data-go="${id}" ${extra}>${label}</button>`;
+  let b = '';
+  if (id === 'chisel') b = go('−', 'data-dir="-1"') + ' ' + go('+', 'data-dir="1"');
+  else if (['recast', 'flip', 'swapTrack', 'stir'].includes(id)) b = go('Use');
+  return `${b} <button data-cancel>Cancel</button>`;
+}
+
+function bindGame(me) {
+  const q = (sel, fn) => $app.querySelectorAll(sel).forEach((el) => (el.onclick = () => fn(el)));
+  const pass = document.getElementById('pass'); if (pass) pass.onclick = () => act({ type: 'pass' });
+  q('[data-die]', (el) => { ui.die = +el.dataset.die; render(); });
+  q('[data-trd]', (el) => { ui.trackDie = { round: +el.dataset.tr, id: +el.dataset.trd }; render(); });
+  q('[data-tool]', (el) => { ui.tool = el.dataset.tool; ui.from = null; render(); });
+  q('[data-cancel]', () => { ui.tool = null; ui.from = null; render(); });
+  q('[data-go]', (el) => {
+    const t = el.dataset.go;
+    if (t !== 'stir' && ui.die === null) return toast('Pick a die from the pool first');
+    if (t === 'swapTrack' && !ui.trackDie) return toast('Pick a die on the round track too');
+    act({ type: 'tool', tool: t, dieId: ui.die, dir: +el.dataset.dir || 0, trackRound: ui.trackDie?.round, trackDieId: ui.trackDie?.id });
+    if (t === 'swapTrack') ui.die = ui.trackDie.id;
+    ui.tool = null; ui.trackDie = null;
+  });
+  q('[data-cell]', (el) => {
+    const cell = +el.dataset.cell;
+    if (ui.tool === 'leadKnife' || ui.tool === 'file') {
+      if (ui.from === null) { ui.from = cell; return render(); }
+      act({ type: 'tool', tool: ui.tool, from: ui.from, to: cell }); ui.tool = null; ui.from = null; return;
+    }
+    act({ type: 'place', dieId: ui.die, cell, tool: ui.tool === 'loose' ? 'loose' : undefined });
+    ui.tool = null;
+  });
+}
+
+function renderEnd() {
+  const objs = S.objectives;
+  $app.innerHTML = `<div class="panel">
+    <h2>${esc(S.results[0].name)} wins!</h2>
+    <table><tr><th>Player</th>${objs.map((o) => `<th>${esc(o.name)}</th>`).join('')}<th>Secret color</th><th>Favor</th><th>Empty</th><th>Total</th></tr>
+    ${S.results.map((r) => `<tr><td>${esc(r.name)}</td>${r.pub.map((x) => `<td>${x.pts}</td>`).join('')}<td>${r.priv} ${secretHtml(S.players[r.i])}</td><td>${r.favor}</td><td>${r.empty}</td><td><b>${r.total}</b></td></tr>`).join('')}</table>
+    <div class="others" style="margin-top:16px">${S.players.map((p) => `<div class="other"><div class="nm">${esc(p.name)}</div>${windowHtml(p.pattern, p.window, { small: true })}</div>`).join('')}</div>
+    <p><button id="again">Back to start</button></p>
+  </div>`;
+  document.getElementById('again').onclick = () => { localStorage.removeItem('gw-seat'); S = null; code = null; history.replaceState(null, '', '/'); render(); };
+}
+
+connect();
