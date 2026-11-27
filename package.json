@@ -1,5 +1,5 @@
 {
-  "name": "kaanch-mahal",
+  "name": "rangrez",
   "version": "1.0.0",
   "description": "Online multiplayer dice-drafting stained-glass window game",
   "main": "server/index.js",

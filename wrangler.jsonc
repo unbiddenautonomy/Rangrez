@@ -1,7 +1,7 @@
-// Cloudflare Workers config for Kaanch Mahal. Deploy with: npx wrangler deploy
+// Cloudflare Workers config for Rangrez. Deploy with: npx wrangler deploy
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "kaanch-mahal",
+  "name": "rangrez",
   "main": "worker/index.js",
   "compatibility_date": "2026-11-01",
   "assets": {

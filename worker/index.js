@@ -1,4 +1,4 @@
-// Kaanch Mahal on Cloudflare Workers.
+// Rangrez on Cloudflare Workers.
 // - Static files in /public are served by Workers Static Assets (see wrangler.jsonc).
 // - Each room is a Durable Object (GameRoom) named by its 4-letter code; it holds the
 //   live WebSockets and saves the game to its storage after every change.

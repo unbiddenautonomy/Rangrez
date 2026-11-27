@@ -1,4 +1,4 @@
-# Kaanch Mahal
+# Rangrez
 
 An online dice-drafting game for 1 to 4 players: draft colored dice and place them into a stained-glass window, following the color and value restrictions of your window pattern. Players join the same room by a 4-letter code (or a shared link) from any device and play in real time.
 
@@ -8,7 +8,7 @@ An online dice-drafting game for 1 to 4 players: draft colored dice and place th
 
 The app runs as a Cloudflare Worker. Each room is a Durable Object named by its code, which holds the players' live WebSocket connections and saves the game after every move. Custom patterns are stored in one more Durable Object. Static files in `public/` are served by Workers Static Assets. Everything fits in Cloudflare's free plan.
 
-**Deploy from GitHub (Workers Builds):** in the Cloudflare dashboard go to Workers & Pages → Create → Import a repository, pick this repo, and keep the defaults (build command empty, deploy command `npx wrangler deploy`). The Worker name must be `kaanch-mahal` to match `wrangler.jsonc`. Every push to `main` then deploys automatically. You get a URL like `https://kaanch-mahal.<your-subdomain>.workers.dev`.
+**Deploy from GitHub (Workers Builds):** in the Cloudflare dashboard go to Workers & Pages → Create → Import a repository, pick this repo, and keep the defaults (build command empty, deploy command `npx wrangler deploy`). The Worker name must be `rangrez` to match `wrangler.jsonc`. Every push to `main` then deploys automatically. You get a URL like `https://rangrez.<your-subdomain>.workers.dev`.
 
 **Or deploy from your computer:**
 

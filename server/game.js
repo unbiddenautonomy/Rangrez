@@ -1,4 +1,4 @@
-// Kaanch Mahal rules engine. Pure state + actions; the server wires it to sockets.
+// Rangrez rules engine. Pure state + actions; the server wires it to sockets.
 const PATTERNS = require('./patterns');
 
 const ROWS = 4, COLS = 5, CELLS = 20, ROUNDS = 10;

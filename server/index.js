@@ -1,4 +1,4 @@
-// Kaanch Mahal Node server: static files + WebSocket rooms. Run: npm install && npm start
+// Rangrez Node server: static files + WebSocket rooms. Run: npm install && npm start
 // (The Cloudflare version lives in worker/index.js and shares server/room.js + server/game.js.)
 const http = require('http');
 const fs = require('fs');
@@ -71,4 +71,4 @@ setInterval(() => {
   for (const [c, r] of rooms) if ((r.isEmpty() && r.touched < Date.now() - 60e3) || r.touched < cut) rooms.delete(c);
 }, 60e3).unref();
 
-server.listen(PORT, () => console.log(`Kaanch Mahal running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Rangrez running on http://localhost:${PORT}`));

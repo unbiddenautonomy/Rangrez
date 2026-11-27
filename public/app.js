@@ -1,4 +1,4 @@
-// Kaanch Mahal client. Vanilla JS; talks to the server over one WebSocket.
+// Rangrez client. Vanilla JS; talks to the server over one WebSocket.
 const COLOR_NAMES = { R: 'Crimson', Y: 'Amber', G: 'Jade', B: 'Cobalt', P: 'Violet' };
 const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 const $app = document.getElementById('app');
@@ -153,7 +153,7 @@ function renderLobby() {
     <h2>Waiting room</h2>
     <p class="muted">Share the code <span class="code">${code}</span> or the link. Players on any device can join until the host starts.</p>
     <ul class="players">${S.players.map((p, i) => `<li>${esc(p.name)} ${i === 0 ? '<span class="muted">(host)</span>' : ''} ${p.connected ? '' : '<span class="off">offline</span>'}</li>`).join('')}</ul>
-    <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Kaanch Mahal originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Kaanch Mahal originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
+    <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Rangrez originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Rangrez originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
     ${isHost ? `<button class="primary" id="start">Start game (${S.players.length} player${S.players.length > 1 ? 's' : ''})</button>` : '<p class="muted">Waiting for the host to start…</p>'}
     <button id="leave">Leave room</button>
   </div>`;
