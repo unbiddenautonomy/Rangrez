@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>document.documentElement.dataset.theme = localStorage.getItem('rz-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');</script>
+<script>document.documentElement.dataset.palette = localStorage.getItem('rz-palette') || 'heritage'; document.documentElement.dataset.theme = localStorage.getItem('rz-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rangrez</title>
@@ -16,6 +16,9 @@
   <h1>Rangrez</h1>
   <div class="hdr-right">
     <button id="theme" class="themebtn" title="Switch light / dark" aria-label="Switch light or dark theme">☾</button>
+    <label class="muted skinpick">Colors <select id="palette" aria-label="Dice colors">
+      <option value="heritage">Heritage dyes</option><option value="jewel">Jewel</option><option value="royal">Royal deep</option><option value="vivid">Vivid</option><option value="soft">Soft</option>
+    </select></label>
     <label class="muted skinpick">Dice <select id="skin" aria-label="Dice skin">
       <option value="classic">Classic</option><option value="glass">Stained glass</option><option value="minakari">Minakari enamel</option>
       <option value="gem">Gemstone</option><option value="matte">Matte pastel</option><option value="numerals">Numerals</option><option value="cards">Card suits</option><option value="knit">Knitted</option>

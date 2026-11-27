@@ -358,6 +358,9 @@ function renderEnd() {
   show();
 }
 
+// Dice color set, remembered on this device.
+{ const sel = document.getElementById('palette'); sel.value = document.documentElement.dataset.palette; sel.onchange = () => { document.documentElement.dataset.palette = sel.value; localStorage.setItem('rz-palette', sel.value); }; }
+
 // Dice skin: purely visual, remembered on this device.
 function applySkin(v) { document.body.dataset.skin = v; localStorage.setItem('gw-skin', v); }
 { const sel = document.getElementById('skin'); sel.value = localStorage.getItem('gw-skin') || 'classic'; applySkin(sel.value); sel.onchange = () => applySkin(sel.value); }

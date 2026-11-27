@@ -278,3 +278,13 @@ tr:first-of-type + tr td { background: rgba(214, 178, 106, .08); }
 [data-theme="light"] .off { color: #b3263a; }
 [data-theme="light"] .pool .die.sel { outline-color: #1c2142; }
 .themebtn { padding: 8px 12px; font-size: 15px; line-height: 1; }
+
+/* ==========================================================================
+   Dice color sets. Each set keeps the five colors at a similar depth so none
+   stands out, while hues stay far apart for reading across the table.
+   ========================================================================== */
+[data-palette="jewel"]    { --R: #d0283e; --Y: #f0b429; --G: #14a06a; --B: #2a5fe0; --P: #8b3fd1; }
+[data-palette="royal"]    { --R: #b0162f; --Y: #dc9a10; --G: #0b7d55; --B: #1e44b8; --P: #6c2aa9; }
+[data-palette="vivid"]    { --R: #ee3b52; --Y: #ffc93a; --G: #22c47f; --B: #3d7dff; --P: #a64ff2; }
+[data-palette="heritage"] { --R: #b73a34; --Y: #d9a12a; --G: #3c8c5c; --B: #2e5a9c; --P: #7a4a9c; }
+[data-palette="soft"]     { --R: #e0606c; --Y: #f2c75c; --G: #4fb88a; --B: #5a8ae8; --P: #a27ad9; }
