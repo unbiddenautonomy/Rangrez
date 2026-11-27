@@ -152,7 +152,8 @@ function renderLobby() {
   $app.innerHTML = `<div class="home panel">
     <h2>Waiting room</h2>
     <p class="muted">Share the code <span class="code">${code}</span> or the link. Players on any device can join until the host starts.</p>
-    <ul class="players">${S.players.map((p, i) => `<li>${esc(p.name)} ${i === 0 ? '<span class="muted">(host)</span>' : ''} ${p.connected ? '' : '<span class="off">offline</span>'}</li>`).join('')}</ul>
+    <ul class="players">${S.players.map((p, i) => `<li>${esc(p.name)} ${i === 0 ? '<span class="muted">(host)</span>' : ''} ${p.bot ? '<span class="muted">bot</span>' : ''} ${p.connected ? '' : '<span class="off">offline</span>'} ${isHost && p.bot ? `<button data-rmbot="${i}">Remove</button>` : ''}</li>`).join('')}</ul>
+    ${isHost && S.players.length < 4 ? `<p>Add a bot: <button data-addbot="easy">Easy</button> <button data-addbot="medium">Medium</button> <button data-addbot="hard">Hard</button></p><p class="muted">Play solo against bots, or fill empty seats while friends join.</p>` : ''}
     <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Rangrez originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Rangrez originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
     ${isHost ? `<button class="primary" id="start">Start game (${S.players.length} player${S.players.length > 1 ? 's' : ''})</button>` : '<p class="muted">Waiting for the host to start…</p>'}
     <button id="leave">Leave room</button>
@@ -160,6 +161,8 @@ function renderLobby() {
   if (isHost) {
     document.getElementById('start').onclick = () => send({ t: 'start' });
     document.getElementById('pset').onchange = (e) => send({ t: 'options', patternSet: e.target.value });
+    $app.querySelectorAll('[data-addbot]').forEach((el) => (el.onclick = () => send({ t: 'addBot', level: el.dataset.addbot })));
+    $app.querySelectorAll('[data-rmbot]').forEach((el) => (el.onclick = () => send({ t: 'removeBot', seat: +el.dataset.rmbot })));
   }
   document.getElementById('leave').onclick = () => send({ t: 'leave' });
 }
@@ -206,7 +209,7 @@ function renderGame() {
       <div class="panel">
         <h3>Draft pool</h3>
         <div class="pool">${S.pool.map((d) => dieHtml(d, `data-die="${d.id}"`, (ui.die === d.id ? 'sel ' : '') + (S.lock === d.id ? 'locked' : ''))).join('') || '<span class="muted">Empty</span>'}</div>
-        <p class="muted">${mine ? (me.placed ? 'Die placed. Use a tool or end your turn.' : ui.tool ? TOOL_HELP[ui.tool] : 'Pick a die, then click a cell in your window.') : 'Waiting for ' + esc(cur.name) + '…'}${S.lock ? ' The gold-ringed die was changed and must be the one you draft.' : ''}</p>
+        <p class="muted">${mine ? (me.placed ? 'Die placed. Use a tool or end your turn.' : ui.tool ? TOOL_HELP[ui.tool] : 'Pick a die, then click a cell in your window.') : (cur.bot ? esc(cur.name) + ' is thinking…' : 'Waiting for ' + esc(cur.name) + '…')}${S.lock ? ' The gold-ringed die was changed and must be the one you draft.' : ''}</p>
       </div>
       <div class="panel" style="text-align:center">
         <h3>${esc(me.name)} · ${esc(me.pattern.name)}</h3>

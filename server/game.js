@@ -234,7 +234,7 @@ function view(g, pi) {
     objectives: g.objectives.map((id) => ({ id, name: OBJECTIVES[id].name, text: OBJECTIVES[id].text, pts: OBJECTIVES[id].pts })),
     tools: g.tools.map((t) => ({ ...t, name: TOOLS[t.id].name, text: TOOLS[t.id].text, cost: t.used ? 2 : 1 })),
     players: g.players.map((p, i) => ({
-      name: p.name, connected: p.connected, window: p.window, favor: p.favor, placed: p.placed, toolUsed: p.toolUsed,
+      name: p.name, bot: p.bot || null, connected: p.connected, window: p.window, favor: p.favor, placed: p.placed, toolUsed: p.toolUsed,
       pattern: p.pattern === null ? null : g.patterns[p.pattern], ready: p.pattern !== null,
       secret: i === pi || g.phase === 'ended' ? p.secret : null,
       choices: i === pi ? p.choices.map((id) => g.patterns[id]) : [],
