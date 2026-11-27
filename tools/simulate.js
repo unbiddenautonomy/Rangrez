@@ -6,13 +6,17 @@ const HOST = process.env.HOST || 'localhost:' + (process.env.PORT || 3000);
 const N = +process.argv[2] || 3;
 const bots = []; let code;
 async function bot(name, create) {
+  // Every player needs an account: register a throwaway one and use its session cookie.
+  name = name + Math.random().toString(36).slice(2, 7);
+  const reg = await fetch('http://' + HOST + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'test-only-pw' }) });
+  const cookie = (reg.headers.get('set-cookie') || '').split(';')[0];
   if (create) code = (await fetch('http://' + HOST + '/api/new-room').then((r) => r.json())).code;
   return new Promise((res) => {
-    const ws = new WebSocket('ws://' + HOST + '/ws/' + code); const b = { ws, name, state: null, errors: 0 };
-    ws.on('open', () => ws.send(JSON.stringify(create ? { t: 'create', name } : { t: 'join', name })));
+    const ws = new WebSocket('ws://' + HOST + '/ws/' + code, { headers: { cookie } }); const b = { ws, name, state: null, errors: 0 };
+    ws.on('open', () => ws.send(JSON.stringify(create ? { t: 'create' } : { t: 'join' })));
     ws.on('message', (raw) => { const m = JSON.parse(raw);
       if (m.t === 'joined') { code = m.code; res(b); }
-      if (m.t === 'error') { b.errors++; console.log(name, 'error:', m.message); }
+      if (m.t === 'error') { b.errors++; console.log(name, 'error:', m.message); if (b.state && b.state.phase === 'playing' && b.state.current === b.state.you) send(b, { t: 'act', action: { type: 'pass' } }); }
       if (m.t === 'state') { b.state = m.state; b.host = m.host; think(b); } });
   });
 }

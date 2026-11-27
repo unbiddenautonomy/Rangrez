@@ -134,3 +134,12 @@ select { background:#15131c; color:var(--text); border:1px solid #4a4360; border
 /* Amber is light: keep its pips dark in every skin so the number reads from across the table */
 [data-skin="glass"] .die.d-Y i, [data-skin="gem"] .die.d-Y i, [data-skin="minakari"] .die.d-Y i { background: #3a2a00; box-shadow: none; }
 [data-skin="knit"] .die.d-Y i { background: #3a2a00; box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #fff7e6; }
+
+/* Accounts, my games, turn clock */
+.games { display: grid; gap: 8px; }
+.gameline { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #16141e; border: 1px solid #3a3450; border-radius: 8px; padding: 8px 10px; }
+.gameline.mine { border-color: var(--gold); background: #2a2214; }
+.yourturn { color: var(--gold); }
+.clock { font: 700 18px monospace; color: var(--text); background: #16141e; border: 1px solid #4a4360; border-radius: 8px; padding: 4px 10px; }
+.clock.low { color: #ff8a8a; border-color: #b8404a; }
+.gameline > div:last-child { display: flex; gap: 6px; flex: none; }

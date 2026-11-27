@@ -1,6 +1,7 @@
 // One game room, independent of transport. Used by the Node server (server/index.js)
 // and by the Cloudflare Durable Object (worker/index.js).
-// A socket only needs send(string) and close().
+// A socket only needs send(string) and close(), plus sock.user = { id, name } for a logged-in player
+// (set by the server from the session cookie, never by the client).
 const G = require('./game');
 const Bots = require('./bots');
 const BOT_DELAY = +(globalThis.process && process.env && process.env.BOT_DELAY) || 900; // ms a bot 'thinks' before moving, so humans can follow along
@@ -8,19 +9,21 @@ const BOT_DELAY = +(globalThis.process && process.env && process.env.BOT_DELAY) 
 const uuid = () => globalThis.crypto.randomUUID(); // Node 19+ and Workers
 
 class Room {
-  // data: saved { game, seats:[{playerId, secret}] } or undefined
-  // hooks: { getCustoms: async () => [...], save: async (data) => {} }
+  // data: saved { game, seats:[{ userId, bot }] } or undefined
+  // hooks: { getCustoms: async () => [...], save: async (data) => {},
+  //          summary: async (userIds, summary) => {}, wake: (atMs) => {} }
   constructor(code, data, hooks = {}) {
     this.code = code;
     this.game = data ? data.game : G.newGameState();
     this.seats = data ? data.seats.map((s) => ({ ...s, socket: null })) : [];
     this.game.players.forEach((p) => { p.connected = !!p.bot; });
     this.botTimer = null;
+    this.clock = null;
     this.hooks = hooks;
     this.touched = Date.now();
   }
 
-  serialize() { return { game: this.game, seats: this.seats.map(({ playerId, secret, bot }) => ({ playerId, secret, bot })) }; }
+  serialize() { return { game: this.game, seats: this.seats.map(({ userId, bot }) => ({ userId, bot })) }; }
   seatOf(sock) { return this.seats.findIndex((s) => s.socket === sock); }
   isEmpty() { return this.seats.length === 0; }
   connectedCount() { return this.seats.filter((s) => s.socket).length; }
@@ -36,7 +39,7 @@ class Room {
     const s = this.seats[i];
     if (s.socket && s.socket !== sock) try { s.socket.close(); } catch {}
     s.socket = sock; this.game.players[i].connected = true;
-    sock.send(JSON.stringify({ t: 'joined', code: this.code, playerId: s.playerId, secret: s.secret }));
+    sock.send(JSON.stringify({ t: 'joined', code: this.code }));
   }
 
   async message(sock, raw) {
@@ -44,19 +47,21 @@ class Room {
     let m; try { m = JSON.parse(raw); } catch { return; }
     const g = this.game;
     try {
-      const name = String(m.name || '').trim().slice(0, 20) || 'Player';
+      const user = sock.user;
+      if (!user) throw new Error('Please log in first');
+      const mine = this.seats.findIndex((s) => s.userId === user.id);
       const seat = this.seatOf(sock);
       if (m.t === 'create') {
         if (!this.isEmpty()) throw new Error('That room code is taken');
-        G.addPlayer(g, 0, name); this.seats.push({ playerId: uuid(), secret: uuid(), socket: null }); this.attach(sock, 0);
-      } else if (m.t === 'join') {
-        if (this.isEmpty()) throw new Error('No room with that code');
-        if (seat >= 0) return;
-        G.addPlayer(g, this.seats.length, name); this.seats.push({ playerId: uuid(), secret: uuid(), socket: null }); this.attach(sock, this.seats.length - 1);
-      } else if (m.t === 'resume') {
-        const i = this.seats.findIndex((s) => s.playerId === m.playerId && s.secret === m.secret);
-        if (i < 0) return send({ t: 'resumeFailed' });
-        this.attach(sock, i);
+        G.addPlayer(g, 0, user.name); this.seats.push({ userId: user.id, socket: null }); this.attach(sock, 0);
+      } else if (m.t === 'join' || m.t === 'resume') {
+        // Your account already has a seat here: pick the game up again, from any device.
+        if (mine >= 0) this.attach(sock, mine);
+        else if (m.t === 'resume') return send({ t: 'resumeFailed', code: this.code, open: !this.isEmpty() && g.phase === 'lobby' });
+        else {
+          if (this.isEmpty()) throw new Error('No room with that code');
+          G.addPlayer(g, this.seats.length, user.name); this.seats.push({ userId: user.id, socket: null }); this.attach(sock, this.seats.length - 1);
+        }
       } else {
         if (seat < 0) throw new Error('Join a room first');
         if (m.t === 'start') {
@@ -68,7 +73,7 @@ class Room {
           const level = ['easy', 'medium', 'hard'].includes(m.level) ? m.level : 'medium';
           G.addPlayer(g, this.seats.length, Bots.botName(g.players.map((p) => p.name), level));
           const bp = g.players[g.players.length - 1]; bp.bot = level; bp.connected = true;
-          this.seats.push({ playerId: uuid(), secret: uuid(), bot: level, socket: null });
+          this.seats.push({ bot: level, socket: null });
         } else if (m.t === 'removeBot') {
           if (seat !== 0) throw new Error('Only the host can remove bots');
           if (g.phase !== 'lobby') throw new Error('Game already started');
@@ -79,6 +84,7 @@ class Room {
           if (seat !== 0) throw new Error('Only the host can change options');
           if (g.phase !== 'lobby') throw new Error('Game already started');
           if (['original', 'custom', 'both'].includes(m.patternSet)) g.patternSet = m.patternSet;
+          if (['timed', 'untimed'].includes(m.mode)) g.mode = m.mode;
         } else if (m.t === 'choose') G.choosePattern(g, seat, m.patternId);
         else if (m.t === 'act') G.act(g, seat, m.action || {});
         else if (m.t === 'leave') {
@@ -100,7 +106,38 @@ class Room {
   async changed() {
     this.broadcast();
     if (this.hooks.save) await this.hooks.save(this.serialize());
+    if (this.hooks.summary) {
+      const ids = this.seats.filter((s) => s.userId).map((s) => s.userId);
+      if (ids.length) try { await this.hooks.summary(ids, this.summary()); } catch {}
+    }
     this.driveBots();
+    this.armClock();
+  }
+
+  // What the "My games" list shows for this room.
+  summary() {
+    const g = this.game, cur = g.phase === 'playing' ? g.order[g.turn] : null;
+    return {
+      phase: g.phase, round: g.round, mode: g.mode || 'untimed',
+      players: g.players.map((p) => p.name),
+      turnUserId: cur !== null && this.seats[cur] ? this.seats[cur].userId || null : null,
+      turnName: cur !== null ? g.players[cur].name : null,
+      winner: g.results ? g.results[0].name : null,
+    };
+  }
+
+  // Timed mode: when the current turn's clock runs out, pass for that player.
+  armClock() {
+    clearTimeout(this.clock); this.clock = null;
+    const g = this.game;
+    if (g.phase !== 'playing' || !g.deadline) return;
+    if (this.hooks.wake) this.hooks.wake(g.deadline); // survives the server sleeping (Cloudflare alarm)
+    this.clock = setTimeout(() => this.checkClock(), Math.max(0, g.deadline - Date.now()) + 50);
+  }
+
+  async checkClock() {
+    if (G.timeout(this.game)) await this.changed();
+    else this.armClock();
   }
 
   // Let bots pick patterns and take their turns, one turn at a time with a short delay.
@@ -112,6 +149,7 @@ class Room {
       if (!waiting.length) return;
       this.botTimer = setTimeout(async () => {
         this.botTimer = null;
+    this.clock = null;
         for (const [p, i] of waiting) if (g.phase === 'choosing' && p.pattern === null) G.choosePattern(g, i, Bots.choosePattern(g, i, p.bot));
         await this.changed();
       }, 400);
@@ -122,6 +160,7 @@ class Room {
     if (!p || !p.bot) return;
     this.botTimer = setTimeout(async () => {
       this.botTimer = null;
+    this.clock = null;
       if (g.phase !== 'playing' || g.order[g.turn] !== pi) return;
       try {
         for (const a of Bots.planTurn(g, pi, p.bot)) {

@@ -6,7 +6,7 @@ An online dice-drafting game for 1 to 4 players: draft colored dice and place th
 
 ### On Cloudflare (recommended for playing online)
 
-The app runs as a Cloudflare Worker. Each room is a Durable Object named by its code, which holds the players' live WebSocket connections and saves the game after every move. Custom patterns are stored in one more Durable Object. Static files in `public/` are served by Workers Static Assets. Everything fits in Cloudflare's free plan.
+The app runs as a Cloudflare Worker. Each room is a Durable Object named by its code, which holds the players' live WebSocket connections, saves the game after every move, and uses an alarm for timed turns. Accounts and each player's game list live in another Durable Object with built-in SQLite storage, and custom patterns in a third. There is no separate database to create. Static files in `public/` are served by Workers Static Assets. Everything fits in Cloudflare's free plan.
 
 **Deploy from GitHub (Workers Builds):** in the Cloudflare dashboard go to Workers & Pages → Create → Import a repository, pick this repo, and keep the defaults (build command empty, deploy command `npx wrangler deploy`). The Worker name must be `rangrez` to match `wrangler.jsonc`. Every push to `main` then deploys automatically. You get a URL like `https://rangrez.<your-subdomain>.workers.dev`.
 
@@ -22,18 +22,22 @@ npm run deploy
 
 ### With plain Node.js
 
-Requires Node.js 19 or newer.
+Requires Node.js 22.5 or newer (it uses the built-in `node:sqlite`).
 
 ```bash
 npm install
 npm start            # http://localhost:3000 (set PORT to change)
 ```
 
-Friends on the same Wi-Fi can open `http://<your-computer-ip>:3000`. Custom patterns are saved to `data/custom-patterns.json`.
+Friends on the same Wi-Fi can open `http://<your-computer-ip>:3000`. Accounts, games and custom patterns are saved in `data/rangrez.db` (set `DATA_DIR` to move it).
 
 ### Playing
 
-Open the page, enter a name, press **Create a room**, then share the code or the **Copy link** button. Reloading the page or losing connection reconnects you to your seat automatically.
+Create an account (name and password), press **Create a room**, then share the code or the **Copy link** button. Everyone who joins needs an account.
+
+- **My games:** every game you're in is listed on the home screen, with whose turn it is. Leave any time and open it again later, from any device you log in on.
+- **Turn timer:** in the waiting room the host picks **No timer** (a game can stretch over days) or **2 minutes per turn** (when time runs out, that player passes).
+- Rooms are kept for 30 days without activity.
 
 ## How to play
 
@@ -59,7 +63,7 @@ Open the page, enter a name, press **Create a room**, then share the code or the
 
 ### Your own patterns
 
-The **Pattern editor** on the start page lets you paint patterns on a grid (or import JSON), with a name and difficulty 3 to 6. They're saved on the server (a Durable Object on Cloudflare, `data/custom-patterns.json` on Node). In the waiting room the host picks which set to deal from: originals, custom, or both.
+The **Pattern editor** on the start page lets you paint patterns on a grid (or import JSON), with a name and difficulty 3 to 6. They're saved on the server. In the waiting room the host picks which set to deal from: originals, custom, or both.
 
 JSON format:
 
@@ -81,7 +85,8 @@ With a server running, `PORT=3000 npm test` (Node) or `HOST=localhost:8787 npm t
 
 - `server/game.js`: rules engine (drafting, placement, tools, scoring)
 - `server/patterns.js`: the 64 built-in window patterns
-- `server/room.js`: one room's players, seats, messages and bot turns, shared by both servers
+- `server/room.js`: one room's players, seats, messages, bot turns and turn clock, shared by both servers
+- `server/accounts.js`: accounts, password hashing (PBKDF2), login sessions and game lists
 - `server/bots.js`: Easy, Medium and Hard bots
 - `server/index.js`: Node server
 - `worker/index.js`: Cloudflare Worker and Durable Objects

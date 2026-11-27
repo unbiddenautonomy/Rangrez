@@ -6,7 +6,15 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 let ws, S = null, code = null, isHost = false;
 let ui = { die: null, tool: null, from: null, trackDie: null };
-const saved = () => JSON.parse(localStorage.getItem('gw-seat') || 'null');
+let ME = null, myGames = [], clockSkew = 0; // logged-in user, their games, server-minus-local clock
+const api = async (path, method = 'GET', body) => {
+  const r = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
+};
+async function loadMe() {
+  const r = await api('/api/me');
+  ME = r.ok ? r.data.user : null; myGames = r.ok ? r.data.games : [];
+}
 
 // One WebSocket per room: /ws/<CODE>. `first` is the message to send once it opens.
 let wantRoom = null, firstMsg = null;
@@ -16,27 +24,30 @@ function connect(roomCode, first) {
   if (!roomCode) return render();
   const sock = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/' + roomCode);
   ws = sock;
-  sock.onopen = () => { const s = saved(); sock.send(JSON.stringify(firstMsg || (s && s.code === roomCode ? { t: 'resume', ...s } : { t: 'resume' }))); firstMsg = null; };
+  sock.onopen = () => { sock.send(JSON.stringify(firstMsg || { t: 'resume' })); firstMsg = null; };
   sock.onmessage = (e) => {
     const m = JSON.parse(e.data);
-    if (m.t === 'joined') { localStorage.setItem('gw-seat', JSON.stringify({ code: m.code, playerId: m.playerId, secret: m.secret })); history.replaceState(null, '', '/' + m.code); }
-    else if (m.t === 'state') { const prevTurn = S && `${S.round}-${S.turn}`; S = m.state; code = m.code; isHost = m.host; if (prevTurn !== `${S.round}-${S.turn}`) resetUi(); render(); }
-    else if (m.t === 'error') { toast(m.message); if (!S) leaveRoom(false); }
-    else if (m.t === 'resumeFailed' || m.t === 'left') leaveRoom(true);
+    if (m.t === 'joined') history.replaceState(null, '', '/' + m.code);
+    else if (m.t === 'state') { const prevTurn = S && `${S.round}-${S.turn}`; S = m.state; code = m.code; isHost = m.host; clockSkew = S.now - Date.now(); if (prevTurn !== `${S.round}-${S.turn}`) resetUi(); render(); }
+    else if (m.t === 'error') { toast(m.message); if (!S) leaveRoom(); }
+    else if (m.t === 'resumeFailed') { const c = m.code; leaveRoom(); if (m.open) { joinCode = c; toast(`Room ${c} is open: press Join to take a seat`); render(); } else toast(`No game with code ${c} for you`); }
+    else if (m.t === 'left') leaveRoom();
   };
-  sock.onclose = () => { if (ws !== sock || !wantRoom) return; toast('Connection lost, reconnecting…'); setTimeout(() => { if (ws === sock && wantRoom) connect(wantRoom); }, 1500); };
+  sock.onclose = () => { if (ws !== sock || !wantRoom) return; if (!S) { leaveRoom(); return toast('Could not open that room. Are you logged in?'); } toast('Connection lost, reconnecting…'); setTimeout(() => { if (ws === sock && wantRoom) connect(wantRoom); }, 1500); };
 }
-function leaveRoom(forget) {
-  if (forget) localStorage.removeItem('gw-seat');
+// Back to the home screen. Your seat in the game is kept; open it again from My games.
+let joinCode = '';
+async function leaveRoom() {
   S = null; code = null; wantRoom = null;
   if (ws) { ws.onclose = null; try { ws.close(); } catch {} ws = null; }
-  history.replaceState(null, '', '/'); render();
+  history.replaceState(null, '', '/');
+  await loadMe(); render();
 }
-async function createRoom(name) {
+async function createRoom() {
   for (let i = 0; i < 5; i++) {
     const { code: c } = await fetch('/api/new-room').then((r) => r.json());
     const ok = await new Promise((res) => {
-      connect(c, { t: 'create', name });
+      connect(c, { t: 'create' });
       const sock = ws, prev = sock.onmessage;
       sock.onmessage = (e) => { const m = JSON.parse(e.data); prev(e); if (m.t === 'joined') { sock.onmessage = prev; res(true); } else if (m.t === 'error') { res(false); } };
     });
@@ -151,36 +162,70 @@ function renderGallery() {
 function render() {
   if (gallery && !S) return renderGallery();
   if (editing && !S) return renderEditor();
-  document.getElementById('roomInfo').innerHTML = code ? `<span class="muted">Room</span> <span class="code">${code}</span> <button id="copy">Copy link</button>` : '';
+  document.getElementById('roomInfo').innerHTML = (code ? `<span class="muted">Room</span> <span class="code">${code}</span> <button id="copy">Copy link</button> <button id="home">My games</button>` : '')
+    + (ME && !code ? `<span class="muted">${esc(ME.name)}</span> <button id="logout">Log out</button>` : '');
   const c = document.getElementById('copy'); if (c) c.onclick = () => { navigator.clipboard?.writeText(location.origin + '/' + code); toast('Link copied'); };
+  const h = document.getElementById('home'); if (h) h.onclick = () => leaveRoom();
+  const lo = document.getElementById('logout'); if (lo) lo.onclick = async () => { await api('/api/logout', 'POST'); ME = null; myGames = []; render(); };
+  if (!ME) return renderAuth();
   if (!S) return renderHome();
   ({ lobby: renderLobby, choosing: renderChoosing, playing: renderGame, ended: renderEnd })[S.phase]();
 }
 
-function renderHome() {
-  const fromUrl = location.pathname.slice(1).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+function renderAuth() {
   $app.innerHTML = `<div class="home panel">
     <h2>Draft dice. Build a window.</h2>
-    <p class="muted">A dice-drafting game for 1 to 4 players. Create a room and share its code, or join a friend's room.</p>
-    <input id="name" placeholder="Your name" maxlength="20" value="${esc(localStorage.getItem('gw-name') || '')}">
+    <p class="muted">A dice-drafting game for 1 to 4 players, with friends or bots. Log in so you can leave a game and continue it later, even days later, from any device.</p>
+    <input id="uname" placeholder="Name" maxlength="20" autocomplete="username">
+    <input id="upass" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+    <div class="row"><button class="primary" id="login" style="flex:1">Log in</button><button id="register" style="flex:1">Create account</button></div>
+    <button id="gallery">Browse all 64 windows</button>
+  </div>`;
+  const go = async (path) => {
+    const r = await api(path, 'POST', { name: document.getElementById('uname').value, password: document.getElementById('upass').value });
+    if (!r.ok) return toast(r.data.error || 'Something went wrong');
+    await loadMe(); const c = urlCode(); if (c) connect(c); else render();
+  };
+  document.getElementById('login').onclick = () => go('/api/login');
+  document.getElementById('register').onclick = () => go('/api/register');
+  document.getElementById('upass').onkeydown = (e) => { if (e.key === 'Enter') go('/api/login'); };
+  document.getElementById('gallery').onclick = () => openGallery();
+}
+
+const urlCode = () => { const c = location.pathname.slice(1).toUpperCase(); return /^[A-Z]{4}$/.test(c) ? c : null; };
+function gameLine(g) {
+  const yours = g.phase === 'playing' && g.turnUserId === ME.id;
+  const status = g.phase === 'lobby' ? 'Waiting room' : g.phase === 'choosing' ? 'Choosing windows' : g.phase === 'ended' ? `Finished · ${esc(g.winner)} won` : yours ? '<b class="yourturn">Your turn</b>' : `Round ${g.round}/10 · ${esc(g.turnName)}'s turn`;
+  const when = new Date(g.updated).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `<div class="gameline ${yours ? 'mine' : ''}"><div><span class="code" style="font-size:16px">${g.code}</span> ${g.mode === 'timed' ? '⏱' : ''} <span>${status}</span>
+    <div class="muted">${g.players.map(esc).join(', ')} · ${when}</div></div>
+    <div><button class="primary" data-open="${g.code}">${g.phase === 'ended' ? 'View' : 'Open'}</button> <button data-forget="${g.code}" title="Remove from my list">✕</button></div></div>`;
+}
+function renderHome() {
+  const c0 = joinCode || ''; joinCode = '';
+  $app.innerHTML = `<div class="home panel">
+    <h2>Hi ${esc(ME.name)}</h2>
     <button class="primary" id="create">Create a room</button>
-    <div class="row"><input id="code" placeholder="Room code" maxlength="4" value="${fromUrl}"><button id="join">Join</button></div>
+    <div class="row"><input id="code" placeholder="Room code" maxlength="4" value="${c0}"><button id="join">Join</button></div>
+    <h3 style="margin-top:8px">My games</h3>
+    <div class="games">${myGames.map(gameLine).join('') || '<span class="muted">No games yet. Games you join show up here, so you can pick them up again any time.</span>'}</div>
     <button id="gallery">Browse all 64 windows</button>
     <button id="editor">Pattern editor (add your own windows)</button>
   </div>`;
   document.getElementById('editor').onclick = () => openEditor();
   document.getElementById('gallery').onclick = () => openGallery();
-  const nm = () => { const v = document.getElementById('name').value.trim(); localStorage.setItem('gw-name', v); return v || 'Player'; };
-  document.getElementById('create').onclick = () => createRoom(nm());
-  document.getElementById('join').onclick = () => { const c = document.getElementById('code').value.toUpperCase().trim(); if (!/^[A-Z]{4}$/.test(c)) return toast('Room codes are 4 letters'); connect(c, { t: 'join', name: nm() }); };
+  document.getElementById('create').onclick = () => createRoom();
+  document.getElementById('join').onclick = () => { const c = document.getElementById('code').value.toUpperCase().trim(); if (!/^[A-Z]{4}$/.test(c)) return toast('Room codes are 4 letters'); connect(c, { t: 'join' }); };
+  $app.querySelectorAll('[data-open]').forEach((el) => (el.onclick = () => connect(el.dataset.open)));
+  $app.querySelectorAll('[data-forget]').forEach((el) => (el.onclick = async () => { const r = await api('/api/games/' + el.dataset.forget, 'DELETE'); if (r.ok) { myGames = r.data.games; render(); } }));
 }
-
 function renderLobby() {
   $app.innerHTML = `<div class="home panel">
     <h2>Waiting room</h2>
-    <p class="muted">Share the code <span class="code">${code}</span> or the link. Players on any device can join until the host starts.</p>
+    <p class="muted">Share the code <span class="code">${code}</span> or the link. Players on any device can join until the host starts. Everyone needs an account.</p>
     <ul class="players">${S.players.map((p, i) => `<li>${esc(p.name)} ${i === 0 ? '<span class="muted">(host)</span>' : ''} ${p.bot ? '<span class="muted">bot</span>' : ''} ${p.connected ? '' : '<span class="off">offline</span>'} ${isHost && p.bot ? `<button data-rmbot="${i}">Remove</button>` : ''}</li>`).join('')}</ul>
     ${isHost && S.players.length < 4 ? `<p>Add a bot: <button data-addbot="easy">Easy</button> <button data-addbot="medium">Medium</button> <button data-addbot="hard">Hard</button></p><p class="muted">Play solo against bots, or fill empty seats while friends join.</p>` : ''}
+    <p>Turn timer: ${isHost ? `<select id="mode"><option value="untimed" ${S.mode === 'untimed' ? 'selected' : ''}>No timer (play over days)</option><option value="timed" ${S.mode === 'timed' ? 'selected' : ''}>2 minutes per turn</option></select>` : `<b>${S.mode === 'timed' ? '2 minutes per turn' : 'No timer'}</b>`}</p>
     <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Rangrez originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Rangrez originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
     ${isHost ? `<button class="primary" id="start">Start game (${S.players.length} player${S.players.length > 1 ? 's' : ''})</button>` : '<p class="muted">Waiting for the host to start…</p>'}
     <button id="leave">Leave room</button>
@@ -188,6 +233,7 @@ function renderLobby() {
   if (isHost) {
     document.getElementById('start').onclick = () => send({ t: 'start' });
     document.getElementById('pset').onchange = (e) => send({ t: 'options', patternSet: e.target.value });
+    document.getElementById('mode').onchange = (e) => send({ t: 'options', mode: e.target.value });
     $app.querySelectorAll('[data-addbot]').forEach((el) => (el.onclick = () => send({ t: 'addBot', level: el.dataset.addbot })));
     $app.querySelectorAll('[data-rmbot]').forEach((el) => (el.onclick = () => send({ t: 'removeBot', seat: +el.dataset.rmbot })));
   }
@@ -229,7 +275,7 @@ function renderGame() {
   $app.innerHTML = `
   <div class="turnbar ${mine ? 'mine' : ''}">
     <div><b>Round ${S.round}/${S.rounds}</b> · ${mine ? 'Your turn' : `${esc(cur.name)}'s turn`} ${mine && S.secondTurn ? '(second pick)' : ''}<div class="muted">${orderNames}</div></div>
-    ${mine ? `<button class="primary" id="pass">${me.placed ? 'End turn' : 'Pass'}</button>` : ''}
+    <div style="display:flex;gap:10px;align-items:center">${S.deadline ? '<span id="clock" class="clock"></span>' : ''}${mine ? `<button class="primary" id="pass">${me.placed ? 'End turn' : 'Pass'}</button>` : ''}</div>
   </div>
   <div class="game" style="margin-top:14px">
     <div class="stack">
@@ -301,10 +347,20 @@ function renderEnd() {
     <div class="others" style="margin-top:16px">${S.players.map((p) => `<div class="other"><div class="nm">${esc(p.name)}</div>${windowHtml(p.pattern, p.window, { small: true })}</div>`).join('')}</div>
     <p><button id="again">Back to start</button></p>
   </div>`;
-  document.getElementById('again').onclick = () => leaveRoom(true);
+  document.getElementById('again').onclick = () => leaveRoom();
 }
 
 // Dice skin: purely visual, remembered on this device.
 function applySkin(v) { document.body.dataset.skin = v; localStorage.setItem('gw-skin', v); }
 { const sel = document.getElementById('skin'); sel.value = localStorage.getItem('gw-skin') || 'classic'; applySkin(sel.value); sel.onchange = () => applySkin(sel.value); }
-{ const s = saved(); connect(s ? s.code : null); }
+// Turn clock for timed games.
+setInterval(() => {
+  const el = document.getElementById('clock');
+  if (!el || !S || !S.deadline) return;
+  const left = Math.max(0, Math.round((S.deadline - (Date.now() + clockSkew)) / 1000));
+  el.textContent = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  el.classList.toggle('low', left <= 20);
+}, 250);
+
+// Start: who am I? Then open the room in the URL, if any.
+loadMe().then(() => { const c = urlCode(); if (ME && c) connect(c); else render(); });

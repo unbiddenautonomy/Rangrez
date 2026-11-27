@@ -13,11 +13,13 @@
   "durable_objects": {
     "bindings": [
       { "name": "GAME_ROOM", "class_name": "GameRoom" },
-      { "name": "PATTERN_LIBRARY", "class_name": "PatternLibrary" }
+      { "name": "PATTERN_LIBRARY", "class_name": "PatternLibrary" },
+      { "name": "ACCOUNTS", "class_name": "AccountStore" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["GameRoom", "PatternLibrary"] }
+    { "tag": "v1", "new_sqlite_classes": ["GameRoom", "PatternLibrary"] },
+    { "tag": "v2", "new_sqlite_classes": ["AccountStore"] }
   ],
   "observability": { "enabled": true }
 }

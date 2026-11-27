@@ -2,6 +2,7 @@
 const PATTERNS = require('./patterns');
 
 const ROWS = 4, COLS = 5, CELLS = 20, ROUNDS = 10;
+const TURN_MS = 2 * 60 * 1000; // timed mode: 2 minutes per turn
 const COLORS = ['R', 'Y', 'G', 'B', 'P'];
 const COLOR_NAMES = { R: 'Crimson', Y: 'Amber', G: 'Jade', B: 'Cobalt', P: 'Violet' };
 
@@ -118,7 +119,18 @@ function beginRound(g, n) {
   log(g, `Round ${n} begins.`);
 }
 
-function resetTurn(g) { g.players.forEach((p) => { p.placed = false; p.toolUsed = false; }); g.lock = null; }
+function resetTurn(g) {
+  g.players.forEach((p) => { p.placed = false; p.toolUsed = false; }); g.lock = null;
+  g.deadline = g.mode === 'timed' && g.phase === 'playing' ? Date.now() + TURN_MS : null;
+}
+
+// Timed mode: if the clock ran out, the current player passes (keeping anything already placed).
+function timeout(g) {
+  if (g.phase !== 'playing' || !g.deadline || Date.now() < g.deadline) return false;
+  log(g, `${g.players[current(g)].name} ran out of time.`);
+  endTurn(g, true);
+  return true;
+}
 const current = (g) => g.order[g.turn];
 const isSecondTurn = (g) => g.turn >= g.players.length;
 
@@ -200,9 +212,9 @@ function act(g, pi, a) {
   throw new Error('Unknown action');
 }
 
-function endTurn(g) {
+function endTurn(g, quiet) {
   const p = g.players[current(g)];
-  if (!p.placed) log(g, `${p.name} passed.`);
+  if (!p.placed && !quiet) log(g, `${p.name} passed.`);
   g.turn++; resetTurn(g);
   if (g.turn >= g.order.length) {
     g.track.push(g.pool); g.pool = [];
@@ -229,7 +241,7 @@ function finish(g) {
 // What a given player is allowed to see.
 function view(g, pi) {
   return {
-    phase: g.phase, patternSet: g.patternSet || 'original', round: g.round, rounds: ROUNDS, turn: g.turn, order: g.order, current: g.phase === 'playing' ? current(g) : null,
+    phase: g.phase, patternSet: g.patternSet || 'original', mode: g.mode || 'untimed', deadline: g.deadline || null, now: Date.now(), round: g.round, rounds: ROUNDS, turn: g.turn, order: g.order, current: g.phase === 'playing' ? current(g) : null,
     secondTurn: isSecondTurn(g), pool: g.pool, track: g.track, lock: g.lock, log: g.log.slice(-25), results: g.results, you: pi,
     objectives: g.objectives.map((id) => ({ id, name: OBJECTIVES[id].name, text: OBJECTIVES[id].text, pts: OBJECTIVES[id].pts })),
     tools: g.tools.map((t) => ({ ...t, name: TOOLS[t.id].name, text: TOOLS[t.id].text, cost: t.used ? 2 : 1 })),
@@ -242,4 +254,4 @@ function view(g, pi) {
   };
 }
 
-module.exports = { setCustomPatterns, validatePattern, newGameState, addPlayer, start, choosePattern, act, view, checkPlacement, PATTERNS, OBJECTIVES, TOOLS, COLORS };
+module.exports = { timeout, TURN_MS, setCustomPatterns, validatePattern, newGameState, addPlayer, start, choosePattern, act, view, checkPlacement, PATTERNS, OBJECTIVES, TOOLS, COLORS };
