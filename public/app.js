@@ -50,7 +50,7 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
 
 function dieHtml(d, attrs = '', cls = '') {
   const on = PIPS[d.value];
-  return `<div class="die d-${d.color} ${cls}" ${attrs} title="${COLOR_NAMES[d.color]} ${d.value}">${[...Array(9)].map((_, i) => `<i class="${on.includes(i) ? 'on' : ''}"></i>`).join('')}</div>`;
+  return `<div class="die d-${d.color} ${cls}" data-v="${d.value}" ${attrs} title="${COLOR_NAMES[d.color]} ${d.value}">${[...Array(9)].map((_, i) => `<i class="${on.includes(i) ? 'on' : ''}"></i>`).join('')}</div>`;
 }
 function windowHtml(pattern, win, opts = {}) {
   let h = `<div class="window ${opts.small ? 'small' : ''}">`;
@@ -124,7 +124,32 @@ function renderEditor() {
   q('#pback', () => { editing = null; render(); });
 }
 
+// ---------- Window gallery ----------
+let gallery = null;
+async function openGallery() {
+  const r = await fetch('/api/patterns').then((x) => x.json());
+  gallery = { builtin: r.builtin, custom: r.custom };
+  render();
+}
+function renderGallery() {
+  const G = gallery, tiers = [3, 4, 5, 6];
+  const group = (list) => tiers.map((d) => {
+    const ps = list.filter((p) => p.difficulty === d);
+    return ps.length ? `<h3 style="margin-top:16px">Difficulty ${d} <span class="dots">${dots(d)}</span> <span class="muted">${ps.length} windows</span></h3>
+      <div class="gallery">${ps.map((p) => `<div class="gcard">${windowHtml(p, null, { small: true })}<div class="pn">${esc(p.name)}</div></div>`).join('')}</div>` : '';
+  }).join('');
+  $app.innerHTML = `<div class="panel">
+    <h2>Window gallery</h2>
+    <p class="muted">Each game deals every player one window from each difficulty. Harder windows have more color and number squares and give more favor tokens. Tinted squares need that color, faded dice need that number.</p>
+    <p><button id="gback">Back</button></p>
+    ${group(G.builtin)}
+    ${G.custom.length ? `<h2 style="margin-top:24px">Your custom windows</h2>${group(G.custom)}` : ''}
+  </div>`;
+  document.getElementById('gback').onclick = () => { gallery = null; render(); };
+}
+
 function render() {
+  if (gallery && !S) return renderGallery();
   if (editing && !S) return renderEditor();
   document.getElementById('roomInfo').innerHTML = code ? `<span class="muted">Room</span> <span class="code">${code}</span> <button id="copy">Copy link</button>` : '';
   const c = document.getElementById('copy'); if (c) c.onclick = () => { navigator.clipboard?.writeText(location.origin + '/' + code); toast('Link copied'); };
@@ -140,9 +165,11 @@ function renderHome() {
     <input id="name" placeholder="Your name" maxlength="20" value="${esc(localStorage.getItem('gw-name') || '')}">
     <button class="primary" id="create">Create a room</button>
     <div class="row"><input id="code" placeholder="Room code" maxlength="4" value="${fromUrl}"><button id="join">Join</button></div>
+    <button id="gallery">Browse all 64 windows</button>
     <button id="editor">Pattern editor (add your own windows)</button>
   </div>`;
   document.getElementById('editor').onclick = () => openEditor();
+  document.getElementById('gallery').onclick = () => openGallery();
   const nm = () => { const v = document.getElementById('name').value.trim(); localStorage.setItem('gw-name', v); return v || 'Player'; };
   document.getElementById('create').onclick = () => createRoom(nm());
   document.getElementById('join').onclick = () => { const c = document.getElementById('code').value.toUpperCase().trim(); if (!/^[A-Z]{4}$/.test(c)) return toast('Room codes are 4 letters'); connect(c, { t: 'join', name: nm() }); };
@@ -277,4 +304,7 @@ function renderEnd() {
   document.getElementById('again').onclick = () => leaveRoom(true);
 }
 
+// Dice skin: purely visual, remembered on this device.
+function applySkin(v) { document.body.dataset.skin = v; localStorage.setItem('gw-skin', v); }
+{ const sel = document.getElementById('skin'); sel.value = localStorage.getItem('gw-skin') || 'classic'; applySkin(sel.value); sel.onchange = () => applySkin(sel.value); }
 { const s = saved(); connect(s ? s.code : null); }

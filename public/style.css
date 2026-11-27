@@ -31,7 +31,7 @@ input { background: #15131c; color: var(--text); border: 1px solid #4a4360; bord
 .cell.c-G { background: color-mix(in srgb, var(--G) 45%, #000); } .cell.c-B { background: color-mix(in srgb, var(--B) 45%, #000); }
 .cell.c-P { background: color-mix(in srgb, var(--P) 45%, #000); }
 .cell.v { background: #ffffff10; }
-.cell.v .die { opacity: .35; background: #d8d2c6; box-shadow: none; }
+.cell.v .die.d-X { opacity: .35; background: #d8d2c6; box-shadow: none; }
 .cell.clickable { cursor: pointer; outline: 2px dashed #e8c87988; }
 .cell.clickable:hover { outline-color: var(--gold); }
 .cell.from { outline: 3px solid var(--gold); }
@@ -85,3 +85,31 @@ th:first-child, td:first-child { text-align: left; }
 .players li { margin: 4px 0; }
 .legend { font-size: 12px; color: var(--muted); }
 select { background:#15131c; color:var(--text); border:1px solid #4a4360; border-radius:8px; padding:8px; font-size:14px; }
+
+/* Header, gallery */
+.hdr-right { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.skinpick select { padding: 5px 8px; margin-left: 4px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.gcard { text-align: center; }
+.gcard .window.small { --cell: 32px; }
+.gcard .pn { margin-top: 4px; font-family: Georgia, serif; font-size: 14px; }
+
+/* ---------- Dice skins (value-hint dice in empty cells keep the plain look) ---------- */
+/* Stained glass: translucent, lit from behind, leaded rim */
+[data-skin="glass"] .die:not(.d-X) { background: radial-gradient(circle at 30% 25%, #fff8 0, #fff0 45%), var(--dc); box-shadow: inset 0 0 0 2px #0006, inset 0 0 12px #fff5, 0 0 10px color-mix(in srgb, var(--dc) 60%, transparent); opacity: .92; }
+[data-skin="glass"] .die:not(.d-X) i { background: #fffd; box-shadow: 0 0 4px #fff; }
+/* Minakari enamel: deep color, gold rim and gold pips */
+[data-skin="minakari"] .die:not(.d-X) { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--dc) 85%, #fff) 0, var(--dc) 55%, color-mix(in srgb, var(--dc) 60%, #000) 100%); box-shadow: inset 0 0 0 calc(var(--cell, 52px) * .05) #d4a843, 0 2px 3px #0008; }
+[data-skin="minakari"] .die:not(.d-X) i { background: radial-gradient(circle at 35% 35%, #fff3b0, #d4a843 60%, #8a6420); }
+/* Gemstone: faceted cut */
+[data-skin="gem"] .die:not(.d-X) { background: conic-gradient(from 45deg, color-mix(in srgb, var(--dc) 70%, #fff), var(--dc), color-mix(in srgb, var(--dc) 55%, #000), var(--dc), color-mix(in srgb, var(--dc) 70%, #fff)); border-radius: 22%; box-shadow: inset 0 0 0 1px #fff6, 0 3px 6px #0008; }
+[data-skin="gem"] .die:not(.d-X) i { background: #fff; box-shadow: 0 0 0 1px #0004; }
+/* Matte pastel: soft, flat, dark pips */
+[data-skin="matte"] .die:not(.d-X) { background: color-mix(in srgb, var(--dc) 55%, #f3ece2); box-shadow: inset 0 -2px 0 #0002; }
+[data-skin="matte"] .die:not(.d-X) i { background: #2a2530; }
+/* Numerals: the number instead of pips */
+[data-skin="numerals"] .die:not(.d-X) { grid-template: 1fr / 1fr; place-items: center; padding: 0; }
+[data-skin="numerals"] .die:not(.d-X) i { display: none; }
+[data-skin="numerals"] .die:not(.d-X)::after { content: attr(data-v); font: 700 calc(var(--cell, 52px) * 0.5) Georgia, serif; color: #fff; text-shadow: 0 1px 2px #0008; }
+[data-skin="numerals"] .die.d-Y::after { color: #3a2a00; text-shadow: none; }
+.die.d-R { --dc: var(--R); } .die.d-Y { --dc: var(--Y); } .die.d-G { --dc: var(--G); } .die.d-B { --dc: var(--B); } .die.d-P { --dc: var(--P); }
