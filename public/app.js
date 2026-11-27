@@ -350,6 +350,14 @@ function renderEnd() {
   document.getElementById('again').onclick = () => leaveRoom();
 }
 
+// Light / dark theme, remembered on this device.
+{
+  const btn = document.getElementById('theme');
+  const show = () => { const t = document.documentElement.dataset.theme; btn.textContent = t === 'light' ? '☾' : '☀'; btn.title = t === 'light' ? 'Switch to dark' : 'Switch to light'; };
+  btn.onclick = () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = t; localStorage.setItem('rz-theme', t); show(); };
+  show();
+}
+
 // Dice skin: purely visual, remembered on this device.
 function applySkin(v) { document.body.dataset.skin = v; localStorage.setItem('gw-skin', v); }
 { const sel = document.getElementById('skin'); sel.value = localStorage.getItem('gw-skin') || 'classic'; applySkin(sel.value); sel.onchange = () => applySkin(sel.value); }
