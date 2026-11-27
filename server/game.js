@@ -1,4 +1,4 @@
-// Sathiya rules engine. Pure state + actions; the server wires it to sockets.
+// Kaanch Mahal rules engine. Pure state + actions; the server wires it to sockets.
 const PATTERNS = require('./patterns');
 
 const ROWS = 4, COLS = 5, CELLS = 20, ROUNDS = 10;

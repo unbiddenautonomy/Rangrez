@@ -1,13 +1,15 @@
-// Plays a full game with bots over real WebSockets against a running server (PORT or 3000).
+// Plays a full game with bots over real WebSockets against a running server.
+// Usage: PORT=3000 node tools/simulate.js [players]   (or HOST=localhost:8787 for wrangler dev)
 const WebSocket = require('ws');
 const { checkPlacement } = require('../server/game');
-const URL = 'ws://localhost:' + (process.env.PORT || 3000);
+const HOST = process.env.HOST || 'localhost:' + (process.env.PORT || 3000);
 const N = +process.argv[2] || 3;
 const bots = []; let code;
-function bot(name, create) {
+async function bot(name, create) {
+  if (create) code = (await fetch('http://' + HOST + '/api/new-room').then((r) => r.json())).code;
   return new Promise((res) => {
-    const ws = new WebSocket(URL); const b = { ws, name, state: null, errors: 0 };
-    ws.on('open', () => ws.send(JSON.stringify(create ? { t: 'create', name } : { t: 'join', name, code })));
+    const ws = new WebSocket('ws://' + HOST + '/ws/' + code); const b = { ws, name, state: null, errors: 0 };
+    ws.on('open', () => ws.send(JSON.stringify(create ? { t: 'create', name } : { t: 'join', name })));
     ws.on('message', (raw) => { const m = JSON.parse(raw);
       if (m.t === 'joined') { code = m.code; res(b); }
       if (m.t === 'error') { b.errors++; console.log(name, 'error:', m.message); }

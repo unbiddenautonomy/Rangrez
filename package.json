@@ -1,9 +1,21 @@
 {
-  "name": "sathiya",
+  "name": "kaanch-mahal",
   "version": "1.0.0",
   "description": "Online multiplayer dice-drafting stained-glass window game",
   "main": "server/index.js",
-  "scripts": { "start": "node server/index.js", "test": "node tools/simulate.js" },
-  "engines": { "node": ">=18" },
-  "dependencies": { "ws": "^8.18.0" }
+  "scripts": {
+    "start": "node server/index.js",
+    "dev:cf": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node tools/simulate.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.168.0"
+  }
 }

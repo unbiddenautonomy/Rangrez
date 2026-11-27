@@ -1,4 +1,4 @@
-// Sathiya client. Vanilla JS; talks to the server over one WebSocket.
+// Kaanch Mahal client. Vanilla JS; talks to the server over one WebSocket.
 const COLOR_NAMES = { R: 'Crimson', Y: 'Amber', G: 'Jade', B: 'Cobalt', P: 'Violet' };
 const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 const $app = document.getElementById('app');
@@ -8,19 +8,42 @@ let ws, S = null, code = null, isHost = false;
 let ui = { die: null, tool: null, from: null, trackDie: null };
 const saved = () => JSON.parse(localStorage.getItem('gw-seat') || 'null');
 
-function connect() {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => { const s = saved(); if (s) ws.send(JSON.stringify({ t: 'resume', ...s })); else render(); };
-  ws.onmessage = (e) => {
+// One WebSocket per room: /ws/<CODE>. `first` is the message to send once it opens.
+let wantRoom = null, firstMsg = null;
+function connect(roomCode, first) {
+  if (ws) { ws.onclose = null; try { ws.close(); } catch {} ws = null; }
+  wantRoom = roomCode; firstMsg = first;
+  if (!roomCode) return render();
+  const sock = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/' + roomCode);
+  ws = sock;
+  sock.onopen = () => { const s = saved(); sock.send(JSON.stringify(firstMsg || (s && s.code === roomCode ? { t: 'resume', ...s } : { t: 'resume' }))); firstMsg = null; };
+  sock.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.t === 'joined') { localStorage.setItem('gw-seat', JSON.stringify({ code: m.code, playerId: m.playerId, secret: m.secret })); history.replaceState(null, '', '/' + m.code); }
     else if (m.t === 'state') { const prevTurn = S && `${S.round}-${S.turn}`; S = m.state; code = m.code; isHost = m.host; if (prevTurn !== `${S.round}-${S.turn}`) resetUi(); render(); }
-    else if (m.t === 'error') toast(m.message);
-    else if (m.t === 'resumeFailed' || m.t === 'left') { localStorage.removeItem('gw-seat'); S = null; code = null; history.replaceState(null, '', '/'); render(); }
+    else if (m.t === 'error') { toast(m.message); if (!S) leaveRoom(false); }
+    else if (m.t === 'resumeFailed' || m.t === 'left') leaveRoom(true);
   };
-  ws.onclose = () => { toast('Connection lost, reconnecting…'); setTimeout(connect, 1500); };
+  sock.onclose = () => { if (ws !== sock || !wantRoom) return; toast('Connection lost, reconnecting…'); setTimeout(() => { if (ws === sock && wantRoom) connect(wantRoom); }, 1500); };
 }
-const send = (m) => ws.send(JSON.stringify(m));
+function leaveRoom(forget) {
+  if (forget) localStorage.removeItem('gw-seat');
+  S = null; code = null; wantRoom = null;
+  if (ws) { ws.onclose = null; try { ws.close(); } catch {} ws = null; }
+  history.replaceState(null, '', '/'); render();
+}
+async function createRoom(name) {
+  for (let i = 0; i < 5; i++) {
+    const { code: c } = await fetch('/api/new-room').then((r) => r.json());
+    const ok = await new Promise((res) => {
+      connect(c, { t: 'create', name });
+      const sock = ws, prev = sock.onmessage;
+      sock.onmessage = (e) => { const m = JSON.parse(e.data); prev(e); if (m.t === 'joined') { sock.onmessage = prev; res(true); } else if (m.t === 'error') { res(false); } };
+    });
+    if (ok) return;
+  }
+}
+const send = (m) => ws && ws.readyState === 1 && ws.send(JSON.stringify(m));
 const act = (action) => send({ t: 'act', action });
 function resetUi() { ui = { die: null, tool: null, from: null, trackDie: null }; }
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
@@ -121,8 +144,8 @@ function renderHome() {
   </div>`;
   document.getElementById('editor').onclick = () => openEditor();
   const nm = () => { const v = document.getElementById('name').value.trim(); localStorage.setItem('gw-name', v); return v || 'Player'; };
-  document.getElementById('create').onclick = () => send({ t: 'create', name: nm() });
-  document.getElementById('join').onclick = () => send({ t: 'join', name: nm(), code: document.getElementById('code').value });
+  document.getElementById('create').onclick = () => createRoom(nm());
+  document.getElementById('join').onclick = () => { const c = document.getElementById('code').value.toUpperCase().trim(); if (!/^[A-Z]{4}$/.test(c)) return toast('Room codes are 4 letters'); connect(c, { t: 'join', name: nm() }); };
 }
 
 function renderLobby() {
@@ -130,7 +153,7 @@ function renderLobby() {
     <h2>Waiting room</h2>
     <p class="muted">Share the code <span class="code">${code}</span> or the link. Players on any device can join until the host starts.</p>
     <ul class="players">${S.players.map((p, i) => `<li>${esc(p.name)} ${i === 0 ? '<span class="muted">(host)</span>' : ''} ${p.connected ? '' : '<span class="off">offline</span>'}</li>`).join('')}</ul>
-    <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Sathiya originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Sathiya originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
+    <p>Window patterns: ${isHost ? `<select id="pset">${[['original', 'Kaanch Mahal originals'], ['custom', 'My custom patterns'], ['both', 'Both']].map(([v, l]) => `<option value="${v}" ${S.patternSet === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<b>${{ original: 'Kaanch Mahal originals', custom: 'Custom patterns', both: 'Originals + custom' }[S.patternSet]}</b>`}</p>
     ${isHost ? `<button class="primary" id="start">Start game (${S.players.length} player${S.players.length > 1 ? 's' : ''})</button>` : '<p class="muted">Waiting for the host to start…</p>'}
     <button id="leave">Leave room</button>
   </div>`;
@@ -248,7 +271,7 @@ function renderEnd() {
     <div class="others" style="margin-top:16px">${S.players.map((p) => `<div class="other"><div class="nm">${esc(p.name)}</div>${windowHtml(p.pattern, p.window, { small: true })}</div>`).join('')}</div>
     <p><button id="again">Back to start</button></p>
   </div>`;
-  document.getElementById('again').onclick = () => { localStorage.removeItem('gw-seat'); S = null; code = null; history.replaceState(null, '', '/'); render(); };
+  document.getElementById('again').onclick = () => leaveRoom(true);
 }
 
-connect();
+{ const s = saved(); connect(s ? s.code : null); }

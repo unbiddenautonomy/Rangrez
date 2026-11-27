@@ -1,19 +1,39 @@
-# Sathiya
+# Kaanch Mahal
 
 An online dice-drafting game for 1 to 4 players: draft colored dice and place them into a stained-glass window, following the color and value restrictions of your window pattern. Players join the same room by a 4-letter code (or a shared link) from any device and play in real time.
 
 ## Run it
 
-Requires Node.js 18 or newer.
+### On Cloudflare (recommended for playing online)
+
+The app runs as a Cloudflare Worker. Each room is a Durable Object named by its code, which holds the players' live WebSocket connections and saves the game after every move. Custom patterns are stored in one more Durable Object. Static files in `public/` are served by Workers Static Assets. Everything fits in Cloudflare's free plan.
+
+**Deploy from GitHub (Workers Builds):** in the Cloudflare dashboard go to Workers & Pages → Create → Import a repository, pick this repo, and keep the defaults (build command empty, deploy command `npx wrangler deploy`). The Worker name must be `kaanch-mahal` to match `wrangler.jsonc`. Every push to `main` then deploys automatically. You get a URL like `https://kaanch-mahal.<your-subdomain>.workers.dev`.
+
+**Or deploy from your computer:**
 
 ```bash
 npm install
-npm start            # serves on http://localhost:3000 (set PORT to change)
+npx wrangler login
+npm run deploy
 ```
 
-Open the page, enter a name, press **Create a room**, then share the code or the **Copy link** button. Friends on the same Wi-Fi can open `http://<your-computer-ip>:3000`. To play over the internet, deploy to any Node host that supports WebSockets (Render, Railway, Fly.io, a VPS) with `npm start` as the start command, or run a tunnel such as `cloudflared tunnel --url http://localhost:3000`.
+**Test the Cloudflare version locally:** `npm run dev:cf`, then open http://localhost:8787.
 
-Reloading the page or losing connection reconnects you to your seat automatically.
+### With plain Node.js
+
+Requires Node.js 19 or newer.
+
+```bash
+npm install
+npm start            # http://localhost:3000 (set PORT to change)
+```
+
+Friends on the same Wi-Fi can open `http://<your-computer-ip>:3000`. Custom patterns are saved to `data/custom-patterns.json`.
+
+### Playing
+
+Open the page, enter a name, press **Create a room**, then share the code or the **Copy link** button. Reloading the page or losing connection reconnects you to your seat automatically.
 
 ## How to play
 
@@ -30,7 +50,7 @@ Reloading the page or losing connection reconnects you to your seat automaticall
 
 ### Your own patterns
 
-The **Pattern editor** on the start page lets you paint patterns on a grid (or import JSON), with a name and difficulty 3 to 6. They're saved in `data/custom-patterns.json`. In the waiting room the host picks which set to deal from: originals, custom, or both.
+The **Pattern editor** on the start page lets you paint patterns on a grid (or import JSON), with a name and difficulty 3 to 6. They're saved on the server (a Durable Object on Cloudflare, `data/custom-patterns.json` on Node). In the waiting room the host picks which set to deal from: originals, custom, or both.
 
 JSON format:
 
@@ -42,4 +62,13 @@ JSON format:
 
 ## Test
 
-With the server running: `PORT=3000 npm test` plays a full 3-player game with bots over WebSockets.
+With a server running, `PORT=3000 npm test` (Node) or `HOST=localhost:8787 npm test` (wrangler dev) plays a full 3-player game with bots over WebSockets.
+
+## Code layout
+
+- `server/game.js`: rules engine (drafting, placement, tools, scoring)
+- `server/patterns.js`: the 20 built-in window patterns
+- `server/room.js`: one room's players, seats and messages, shared by both servers
+- `server/index.js`: Node server
+- `worker/index.js`: Cloudflare Worker and Durable Objects
+- `public/`: the browser app
