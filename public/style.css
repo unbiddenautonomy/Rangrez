@@ -124,15 +124,13 @@ select { background:#15131c; color:var(--text); border:1px solid #4a4360; border
 
 /* Knitted: stitched wool texture in the die's color, pips are big cream buttons with a dark rim */
 [data-skin="knit"] .die:not(.d-X) {
-  background:
-    repeating-linear-gradient(60deg, #0000 0 4px, #0003 4px 5px),
-    repeating-linear-gradient(-60deg, #0000 0 4px, #fff2 4px 5px),
-    var(--dc);
-  border-radius: 24%;
-  box-shadow: inset 0 0 0 2px #0004, inset 0 -3px 0 #0003, 0 2px 3px #0008;
+  /* chunky stockinette: fat yarn loops in V columns, drawn over the die's color */
+  background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='20'%20height='16'%20viewBox='0%200%2020%2016'%3E%3Cg%20stroke='%23000'%20stroke-opacity='.45'%20stroke-width='1.3'%20fill='%23fff'%20fill-opacity='.3'%3E%3Cellipse%20cx='5.5'%20cy='8'%20rx='4'%20ry='7.6'%20transform='rotate%28-28%205.5%208%29'/%3E%3Cellipse%20cx='14.5'%20cy='8'%20rx='4'%20ry='7.6'%20transform='rotate%2828%2014.5%208%29'/%3E%3C/g%3E%3Cg%20stroke='%23fff'%20stroke-opacity='.35'%20stroke-width='1'%20fill='none'%3E%3Cpath%20d='M3.2%203.5%20Q5%207%206.8%2012'%20transform='rotate%28-28%205.5%208%29'/%3E%3Cpath%20d='M12.2%203.5%20Q14%207%2015.8%2012'%20transform='rotate%2828%2014.5%208%29'/%3E%3C/g%3E%3C/svg%3E") 0 0 / calc(var(--cell, 52px) * .42) calc(var(--cell, 52px) * .34), var(--dc);
+  border-radius: 26%;
+  box-shadow: inset 0 0 0 calc(var(--cell, 52px) * .05) color-mix(in srgb, var(--dc) 65%, #000), inset 0 -3px 0 #0003, 0 2px 3px #0008;
 }
-[data-skin="knit"] .die:not(.d-X) i { width: 80%; height: 80%; background: #fff7e6; box-shadow: 0 0 0 calc(var(--cell, 52px) * .025) #2a1f1a, inset 0 -2px 0 #0002; }
+[data-skin="knit"] .die:not(.d-X) i { width: 86%; height: 86%; background: radial-gradient(circle at 50% 50%, #0000 0 18%, #fff7e6 20%); box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #2a1f1a, inset 0 -2px 0 #0003; }
 
 /* Amber is light: keep its pips dark in every skin so the number reads from across the table */
 [data-skin="glass"] .die.d-Y i, [data-skin="gem"] .die.d-Y i, [data-skin="minakari"] .die.d-Y i { background: #3a2a00; box-shadow: none; }
-[data-skin="knit"] .die.d-Y i { background: #3a2a00; box-shadow: 0 0 0 calc(var(--cell, 52px) * .025) #fff7e6; }
+[data-skin="knit"] .die.d-Y i { background: #3a2a00; box-shadow: 0 0 0 calc(var(--cell, 52px) * .03) #fff7e6; }
