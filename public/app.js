@@ -116,7 +116,7 @@ function renderEditor() {
       <button data-edit="${p.id}">Edit</button> <button data-del="${p.id}">Delete</button></div>`).join('') || '<span class="muted">None yet.</span>'}</div>
     <h3 style="margin-top:14px">Import / export JSON</h3>
     <p class="muted">Format: a list of {"name", "difficulty" 3-6, "rows": 4 strings of 5 characters}. Use . for open, R Y G B P for colors, 1-6 for values.</p>
-    <textarea id="pjson" rows="6" style="width:100%;background:#15131c;color:var(--text);border:1px solid #4a4360;border-radius:8px;font-family:monospace" placeholder='[{"name":"My Window","difficulty":4,"rows":["R...3",".G.4.","..B..","1...Y"]}]'></textarea>
+    <textarea id="pjson" rows="6" style="width:100%;font-family:monospace;font-size:13px" placeholder='[{"name":"My Window","difficulty":4,"rows":["R...3",".G.4.","..B..","1...Y"]}]'></textarea>
     <p><button id="pimport">Import</button> <button id="pexport">Export mine</button> <button id="pback">Back</button></p>
   </div></div>`;
   const q = (sel, fn) => $app.querySelectorAll(sel).forEach((el) => (el.onclick = () => fn(el)));
